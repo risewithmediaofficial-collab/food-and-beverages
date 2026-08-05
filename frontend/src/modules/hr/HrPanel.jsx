@@ -153,7 +153,7 @@ export default function HrPanel({ triggerError }) {
 
   const copyLoginMessage = (emp) => {
     const username = emp.username || emp.email || `${emp.name.toLowerCase().replace(/\s+/g, '')}@juice-erp.com`;
-    const text = `Hello ${emp.name},\nYour JuiceFlow ERP account has been created.\n\nUsername/Email: ${username}\nRole: ${emp.designation || emp.role}\nDepartment: ${emp.department}\nPortal Link: ${window.location.origin}\n\nUse the password shared by your administrator.`;
+    const text = `Hello ${emp.name},\nYour Food & Beverages ERP account has been created.\n\nUsername/Email: ${username}\nRole: ${emp.designation || emp.role}\nDepartment: ${emp.department}\nPortal Link: ${window.location.origin}\n\nUse the password shared by your administrator.`;
     navigator.clipboard.writeText(text);
     if (triggerError) triggerError('Login message copied to clipboard!', 'success');
   };
@@ -454,7 +454,7 @@ export default function HrPanel({ triggerError }) {
               <textarea
                 readOnly
                 rows={6}
-                value={`Hello ${messageModalEmp.name},\nYour JuiceFlow ERP account has been created.\n\nUsername: ${messageModalEmp.username || messageModalEmp.email || '-'}\nRole: ${messageModalEmp.designation || messageModalEmp.role}\nDepartment: ${messageModalEmp.department}\nPortal Link: ${window.location.origin}\n\nUse the password shared by your administrator.`}
+                value={`Hello ${messageModalEmp.name},\nYour Food & Beverages ERP account has been created.\n\nUsername: ${messageModalEmp.username || messageModalEmp.email || '-'}\nRole: ${messageModalEmp.designation || messageModalEmp.role}\nDepartment: ${messageModalEmp.department}\nPortal Link: ${window.location.origin}\n\nUse the password shared by your administrator.`}
                 className="w-full border border-slate-200 rounded-xl p-3 text-xs font-mono bg-slate-50 text-slate-700 resize-none"
               />
 

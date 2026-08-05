@@ -68,12 +68,12 @@ export default function LoginPanel({ onLoginSuccess }) {
               <Icon icon="mdi:fruit-citrus" className="text-2xl" />
             </div>
             <div>
-              <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">JuiceFlow ERP</h1>
-              <span className="text-xs text-slate-400 font-semibold block">Manufacturing Portal</span>
+              <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Food & Beverages ERP</h1>
+              <span className="text-xs text-slate-400 font-semibold block">Operations Portal</span>
             </div>
           </div>
           <span className="text-xs font-semibold px-3 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded-full">
-            v2.4 Production Engine
+            v2.4 F&B Operations
           </span>
         </div>
 

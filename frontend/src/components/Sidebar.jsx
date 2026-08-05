@@ -169,10 +169,10 @@ export default function Sidebar({ activeModule, user, onLogout, isOpen, onClose,
                 </div>
                 <div className="flex-1 min-w-0">
                   <h1 className="text-sm font-extrabold text-slate-900 leading-none">
-                    JuiceFlow <span className="text-orange-500">ERP</span>
+                    Food & Beverages <span className="text-orange-500">ERP</span>
                   </h1>
                   <span className="text-[10px] text-slate-400 font-semibold block mt-0.5 uppercase tracking-wider">
-                    Food & Beverage Suite
+                    Operations Suite
                   </span>
                 </div>
               </div>

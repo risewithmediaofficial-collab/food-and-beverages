@@ -30,7 +30,7 @@ export default function HelpPanel() {
             <Icon icon="mdi:help-circle-outline" className="text-orange-400 text-xl" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-white">JuiceFlow ERP — Help Center & User Guide</h2>
+            <h2 className="text-base font-extrabold text-white">Food & Beverages ERP — Help Center & User Guide</h2>
             <p className="text-xs text-slate-400">Quick reference for all ERP modules, keyboard shortcuts, and FAQ for your team</p>
           </div>
         </div>
@@ -106,7 +106,7 @@ export default function HelpPanel() {
           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-center space-y-2">
             <Icon icon="mdi:email-outline" className="text-orange-500 text-2xl mx-auto" />
             <p className="text-xs font-extrabold text-slate-800">Email Support</p>
-            <p className="text-[11px] text-slate-500 font-mono">support@juiceflow-erp.com</p>
+            <p className="text-[11px] text-slate-500 font-mono">support@foodbeverages-erp.com</p>
           </div>
           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-center space-y-2">
             <Icon icon="mdi:phone-outline" className="text-orange-500 text-2xl mx-auto" />
