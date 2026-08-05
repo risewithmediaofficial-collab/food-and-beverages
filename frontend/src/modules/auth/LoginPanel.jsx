@@ -2,69 +2,87 @@ import { useState } from 'react';
 import { api } from '../../lib/api';
 import { Icon } from '@iconify/react';
 
-const DEPARTMENT_PRESETS = [
-  { email: 'admin@juice-erp.com', label: 'General Manager', dept: 'Executive', icon: 'mdi:shield-account', color: 'bg-blue-50 text-blue-600 border-blue-200' },
-  { email: 'sales@juice-erp.com', label: 'Sales Manager', dept: 'Sales & CRM', icon: 'mdi:chart-timeline-variant', color: 'bg-amber-50 text-amber-600 border-amber-200' },
-  { email: 'production@juice-erp.com', label: 'Production Lead', dept: 'Plant Operations', icon: 'mdi:factory', color: 'bg-indigo-50 text-indigo-600 border-indigo-200' },
-  { email: 'inventory@juice-erp.com', label: 'Warehouse Manager', dept: 'Supply Chain', icon: 'mdi:package-variant-closed', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
-  { email: 'operator@juice-erp.com', label: 'Line Operator', dept: 'Machine Worker', icon: 'mdi:robot-industrial', color: 'bg-purple-50 text-purple-600 border-purple-200' },
-  { email: 'quality@juice-erp.com', label: 'Quality Tech', dept: 'QC & Food Safety', icon: 'mdi:beaker-check', color: 'bg-rose-50 text-rose-600 border-rose-200' },
-  { email: 'finance@juice-erp.com', label: 'Accountant', dept: 'Finance & Ledger', icon: 'mdi:finance', color: 'bg-teal-50 text-teal-600 border-teal-200' },
-];
+const initialSignup = {
+  name: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+};
 
 export default function LoginPanel({ onLoginSuccess }) {
-  const [selectedEmail, setSelectedEmail] = useState('admin@juice-erp.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const handleSelectPreset = (preset) => {
-    setSelectedEmail(preset.email);
-    setPassword('');
-  };
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
+  const [signup, setSignup] = useState(initialSignup);
+  const [signupLoading, setSignupLoading] = useState(false);
+  const [signupError, setSignupError] = useState('');
+  const [signupMessage, setSignupMessage] = useState('');
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    const preset = DEPARTMENT_PRESETS.find(p => p.email === selectedEmail) || DEPARTMENT_PRESETS[0];
-
     try {
-      const res = await api.post('/auth/login', { email: selectedEmail, password });
+      const res = await api.post('/auth/login', { email: email.trim(), password });
       if (res.success && res.accessToken) {
         localStorage.setItem('access_token', res.accessToken);
         localStorage.setItem('user', JSON.stringify(res.user));
-        setLoading(false);
         onLoginSuccess(res.user);
         return;
       }
       throw new Error(res.message || 'Login failed');
     } catch (err) {
-      console.warn('Backend login fallback active.', err);
-      const fallbackUser = {
-        id: 'usr_' + Date.now(),
-        name: preset.label,
-        email: selectedEmail,
-        roleName: preset.label,
-        department: preset.dept,
-      };
-      localStorage.setItem('access_token', 'local_token_' + Date.now());
-      localStorage.setItem('user', JSON.stringify(fallbackUser));
+      setError(err.message || 'Invalid username or password.');
+    } finally {
       setLoading(false);
-      onLoginSuccess(fallbackUser);
+    }
+  };
+
+  const handleCreateAccount = async (e) => {
+    e.preventDefault();
+    setSignupError('');
+    setSignupMessage('');
+
+    if (signup.password !== signup.confirmPassword) {
+      setSignupError('Passwords do not match.');
+      return;
+    }
+
+    setSignupLoading(true);
+    try {
+      const res = await api.post('/auth/register', {
+        name: signup.name.trim(),
+        email: signup.email.trim(),
+        password: signup.password,
+      });
+
+      if (!res.success) {
+        throw new Error(res.message || 'Account creation failed.');
+      }
+
+      setEmail(signup.email.trim());
+      setPassword('');
+      setSignup(initialSignup);
+      setSignupMessage('Account created. You can sign in now.');
+      setShowCreateAccount(false);
+    } catch (err) {
+      setSignupError(err.message || 'Account creation failed.');
+    } finally {
+      setSignupLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800">
-      <div className="w-full max-w-3xl bg-white border border-slate-200/80 rounded-3xl shadow-xl shadow-slate-200/40 p-8 space-y-6">
-        
-        {/* Header */}
+      <div className="w-full max-w-md bg-white border border-slate-200/80 rounded-3xl shadow-xl shadow-slate-200/40 p-8 space-y-6">
         <div className="flex items-center justify-between border-b border-slate-100 pb-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs">
+            <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600">
               <Icon icon="mdi:fruit-citrus" className="text-2xl" />
             </div>
             <div>
@@ -72,95 +90,161 @@ export default function LoginPanel({ onLoginSuccess }) {
               <span className="text-xs text-slate-400 font-semibold block">Operations Portal</span>
             </div>
           </div>
-          <span className="text-xs font-semibold px-3 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded-full">
-            v2.4 F&B Operations
-          </span>
         </div>
 
-        {/* 1-Click Department Select */}
-        <div>
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-3">1-Click Login By Department</label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-            {DEPARTMENT_PRESETS.map((preset) => {
-              const isSelected = selectedEmail === preset.email;
-              return (
-                <button
-                  key={preset.email}
-                  type="button"
-                  onClick={() => handleSelectPreset(preset)}
-                  className={`flex items-center gap-2.5 p-3 rounded-2xl border text-left text-xs transition cursor-pointer ${
-                    isSelected
-                      ? 'bg-blue-50/90 border-blue-500 shadow-sm text-blue-900 font-bold'
-                      : 'bg-slate-50/70 border-slate-200/80 text-slate-700 hover:bg-slate-100/80'
-                  }`}
-                >
-                  <div className={`p-1.5 rounded-xl border ${preset.color}`}>
-                    <Icon icon={preset.icon} className="text-base" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="block font-bold text-slate-900 truncate">{preset.label}</span>
-                    <span className="block text-[10px] text-slate-400 truncate">{preset.dept}</span>
-                  </div>
-                </button>
-              );
-            })}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Username / Email</label>
+            <input
+              type="text"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-orange-500 outline-none transition"
+            />
           </div>
-        </div>
 
-        {/* Credentials Form */}
-        <form onSubmit={handleSubmit} className="space-y-4 pt-2 border-t border-slate-100">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">Email</label>
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Password</label>
+            <div className="relative">
               <input
-                type="email"
+                type={showPassword ? 'text' : 'password'}
                 required
-                value={selectedEmail}
-                onChange={(e) => setSelectedEmail(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-blue-500 outline-none transition"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                className="w-full px-3.5 py-2.5 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-orange-500 outline-none transition"
               />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3.5 py-2.5 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-blue-500 outline-none transition"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute inset-y-0 right-2 flex items-center px-1.5 text-slate-400 hover:text-slate-700"
-                  title={showPassword ? 'Hide password' : 'Show password'}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  <Icon icon={showPassword ? 'mdi:eye-off-outline' : 'mdi:eye-outline'} className="text-base" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute inset-y-0 right-2 flex items-center px-1.5 text-slate-400 hover:text-slate-700"
+                title={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                <Icon icon={showPassword ? 'mdi:eye-off-outline' : 'mdi:eye-outline'} className="text-lg" />
+              </button>
             </div>
           </div>
+
+          {error && <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-2xl px-3 py-2">{error}</div>}
+          {signupMessage && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-2xl px-3 py-2">{signupMessage}</div>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-500/20 transition flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3 bg-orange-600 hover:bg-orange-700 disabled:opacity-70 text-white text-sm font-bold rounded-xl shadow-lg shadow-orange-500/20 transition flex items-center justify-center gap-2 cursor-pointer"
           >
-            {loading ? (
-              <Icon icon="mdi:loading" className="animate-spin text-base" />
-            ) : (
-              <>
-                <span>Sign In to {DEPARTMENT_PRESETS.find(p => p.email === selectedEmail)?.label || 'Dashboard'}</span>
-                <Icon icon="mdi:arrow-right" className="text-base" />
-              </>
-            )}
+            {loading ? <Icon icon="mdi:loading" className="animate-spin text-base" /> : <><span>Sign In</span><Icon icon="mdi:arrow-right" className="text-base" /></>}
           </button>
-          {error && <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-2xl px-3 py-2 mt-3">{error}</div>}
-        </form>
 
+          <button
+            type="button"
+            onClick={() => {
+              setShowCreateAccount(true);
+              setSignupError('');
+              setSignupMessage('');
+            }}
+            className="w-full py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-bold rounded-xl transition flex items-center justify-center gap-2"
+          >
+            <Icon icon="mdi:account-plus-outline" className="text-base" />
+            <span>Create New Account</span>
+          </button>
+        </form>
       </div>
+
+      {showCreateAccount && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <form onSubmit={handleCreateAccount} className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Icon icon="mdi:account-plus-outline" className="text-orange-600 text-lg" />
+                Create New Account
+              </h2>
+              <button type="button" onClick={() => setShowCreateAccount(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" aria-label="Close">
+                <Icon icon="mdi:close" className="text-lg" />
+              </button>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Full Name</label>
+              <input
+                type="text"
+                required
+                value={signup.name}
+                onChange={(e) => setSignup({ ...signup, name: e.target.value })}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-orange-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Username / Email</label>
+              <input
+                type="email"
+                required
+                value={signup.email}
+                onChange={(e) => setSignup({ ...signup, email: e.target.value })}
+                autoComplete="username"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-orange-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Password</label>
+                <div className="relative">
+                  <input
+                    type={showSignupPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    value={signup.password}
+                    onChange={(e) => setSignup({ ...signup, password: e.target.value })}
+                    autoComplete="new-password"
+                    className="w-full px-3.5 py-2.5 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-orange-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSignupPassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-2 flex items-center px-1.5 text-slate-400 hover:text-slate-700"
+                    title={showSignupPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showSignupPassword ? 'Hide password' : 'Show password'}
+                  >
+                    <Icon icon={showSignupPassword ? 'mdi:eye-off-outline' : 'mdi:eye-outline'} className="text-lg" />
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Confirm Password</label>
+                <input
+                  type={showSignupPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={signup.confirmPassword}
+                  onChange={(e) => setSignup({ ...signup, confirmPassword: e.target.value })}
+                  autoComplete="new-password"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-orange-500"
+                />
+              </div>
+            </div>
+
+            {signupError && <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-2xl px-3 py-2">{signupError}</div>}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button type="button" onClick={() => setShowCreateAccount(false)} className="px-4 py-2 text-sm text-slate-500 hover:text-slate-800">Cancel</button>
+              <button
+                type="submit"
+                disabled={signupLoading}
+                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-70 text-white text-sm font-bold rounded-xl flex items-center gap-2"
+              >
+                {signupLoading && <Icon icon="mdi:loading" className="animate-spin text-base" />}
+                <span>Create Account</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import RawMaterialPanel from './modules/rawmaterial/RawMaterialPanel';
 import InventoryPanel from './modules/inventory/InventoryPanel';
 import WarehousePanel from './modules/inventory/WarehousePanel';
 import ProductionPlanningPanel from './modules/planning/ProductionPlanningPanel';
+import ProductionPanel from './modules/production/ProductionPanel';
 import BatchManagementPanel from './modules/production/BatchManagementPanel';
 import MachinePanel from './modules/machine/MachinePanel';
 import MachineOperationPanel from './modules/machine/MachineOperationPanel';
@@ -259,7 +260,7 @@ export const MODULE_ROUTE_ITEMS = [
     path: '/production',
     label: 'Production Orders',
     icon: 'mdi:cogs',
-    component: BatchManagementPanel,
+    component: ProductionPanel,
     requiredFields: ['Order number', 'Recipe', 'Quantity', 'Schedule'],
     details: 'Manage production orders and batch lifecycle execution.',
   },

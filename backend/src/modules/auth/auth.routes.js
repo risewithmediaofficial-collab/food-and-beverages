@@ -104,28 +104,11 @@ router.post('/login', async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Email and password are required.' });
     }
+    const normalizedEmail = String(email).trim().toLowerCase();
 
-    let user = await User.findOne({ email, isActive: true });
+    let user = await User.findOne({ email: normalizedEmail, isActive: true });
     if (!user) {
-      const preset = DEPARTMENT_PRESETS.find(p => p.email === email);
-      const name = preset ? preset.name : email.split('@')[0];
-      const department = preset ? preset.dept : 'Executive';
-      const roleName = preset ? preset.roleName : 'General Manager';
-
-      const passwordHash = await bcrypt.hash(password, 10);
-      user = new User({
-        email,
-        passwordHash,
-        name,
-        department,
-        roleName,
-        role: roleName,
-        empId: preset ? preset.empId : `EMP-${Math.floor(100 + Math.random() * 900)}`,
-        plant: preset ? preset.plant : 'Nashik Facility #1',
-        status: 'Active',
-        isActive: true,
-      });
-      await user.save();
+      return res.status(401).json({ success: false, message: 'Invalid credentials.' });
     } else {
       const passwordMatch = await bcrypt.compare(password, user.passwordHash);
       if (!passwordMatch) {
@@ -148,6 +131,45 @@ router.post('/login', async (req, res) => {
     const refreshToken = jwt.sign(payload, config.jwtRefreshSecret, { expiresIn: '7d' });
 
     res.json({ success: true, accessToken, refreshToken, user: payload });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/register', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Name, email and password are required.' });
+    }
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    const exists = await User.findOne({ email: normalizedEmail });
+    if (exists) {
+      return res.status(409).json({ success: false, message: 'Account already exists.' });
+    }
+
+    const roleAccess = await resolveRoleAccess('Employee');
+    const passwordHash = await bcrypt.hash(password, 10);
+    const count = await User.countDocuments();
+    const newUser = await User.create({
+      empId: `EMP-${101 + count}`,
+      name: String(name).trim(),
+      email: normalizedEmail,
+      passwordHash,
+      roleId: roleAccess.roleId,
+      roleName: roleAccess.roleName,
+      role: roleAccess.roleName,
+      permissions: roleAccess.permissions,
+      department: 'Employee Self Service',
+      plant: 'Nashik Facility #1',
+      status: 'Active',
+      isActive: true,
+    });
+
+    const safeUser = newUser.toObject();
+    delete safeUser.passwordHash;
+    res.status(201).json({ success: true, data: safeUser, message: 'Account created successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

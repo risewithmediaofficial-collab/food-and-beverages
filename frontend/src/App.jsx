@@ -12,6 +12,7 @@ import PurchasePanel from './modules/purchase/PurchasePanel';
 import RawMaterialPanel from './modules/rawmaterial/RawMaterialPanel';
 import InventoryPanel from './modules/inventory/InventoryPanel';
 import ProductionPlanningPanel from './modules/planning/ProductionPlanningPanel';
+import ProductionPanel from './modules/production/ProductionPanel';
 import BatchManagementPanel from './modules/production/BatchManagementPanel';
 import MachinePanel from './modules/machine/MachinePanel';
 import MachineOperationPanel from './modules/machine/MachineOperationPanel';
@@ -140,7 +141,7 @@ function App() {
       case 'inventory':   return <InventoryPanel user={user} triggerError={triggerError} />;
       case 'warehouse':   return <WarehousePanel user={user} triggerError={triggerError} />;
       case 'planning':    return <ProductionPlanningPanel user={user} triggerError={triggerError} />;
-      case 'production':
+      case 'production':  return <ProductionPanel user={user} triggerError={triggerError} />;
       case 'batches':     return <BatchManagementPanel user={user} triggerError={triggerError} />;
       case 'machine':     return <MachinePanel user={user} triggerError={triggerError} />;
       case 'machine_operation': return <MachineOperationPanel user={user} triggerError={triggerError} />;
