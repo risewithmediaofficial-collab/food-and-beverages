@@ -82,87 +82,89 @@ export default function LoginPanel({ onLoginSuccess }) {
     <div className="auth-outer font-sans text-slate-900">
       <div className="auth-split">
         <div className="auth-illustration">
-          <img src={splash} alt="splash" className="splash-img" />
+          <img src={splash} alt="" className="splash-img" />
         </div>
 
         <div className="auth-card-wrapper">
           <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-200/60 overflow-hidden auth-card">
-        <div className="auth-header">
-          <div className="flex items-center gap-3">
-            <div className="brand-badge bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 shrink-0">
-              <Icon icon="mdi:fruit-citrus" className="text-2xl" />
+            <div className="auth-header">
+              <div className="flex items-center gap-3">
+                <div className="brand-badge bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+                  <Icon icon="mdi:fruit-citrus" className="text-2xl" />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-xl font-extrabold text-slate-950 leading-tight">Food & Beverages ERP</h1>
+                  <span className="text-sm text-slate-500 font-semibold block mt-0.5">Operations Portal</span>
+                </div>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h1 className="text-xl font-extrabold text-slate-950 leading-tight">Food & Beverages ERP</h1>
-              <span className="text-sm text-slate-500 font-semibold block mt-0.5">Operations Portal</span>
-            </div>
-          </div>
-        </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-6 space-y-4">
-          <div>
-            <label className="text-sm font-bold text-slate-700 block mb-2">Username / Email</label>
-            <input
-              type="text"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="username"
-              className="w-full h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-950 focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition"
-            />
-          </div>
+            <form onSubmit={handleSubmit} className="px-6 py-6 space-y-4">
+              <div>
+                <label className="text-sm font-bold text-slate-700 block mb-2">Username / Email</label>
+                <input
+                  type="text"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="username"
+                  className="w-full h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-950 focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition"
+                />
+              </div>
 
-          <div>
-            <label className="text-sm font-bold text-slate-700 block mb-2">Password</label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                className="w-full h-11 px-3.5 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-950 focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition"
-              />
+              <div>
+                <label className="text-sm font-bold text-slate-700 block mb-2">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    className="w-full h-11 px-3.5 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-950 focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-3 flex items-center px-1 text-slate-500 hover:text-slate-900"
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    <Icon icon={showPassword ? 'mdi:eye-off-outline' : 'mdi:eye-outline'} className="text-lg" />
+                  </button>
+                </div>
+              </div>
+
+              {error && <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-2xl px-3 py-2">{error}</div>}
+              {signupMessage && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-2xl px-3 py-2">{signupMessage}</div>}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full h-11 disabled:opacity-70 text-white text-sm font-bold rounded-xl btn-primary transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {loading ? <Icon icon="mdi:loading" className="animate-spin text-base" /> : <><span>Sign In</span><Icon icon="mdi:arrow-right" className="text-base" /></>}
+              </button>
+
               <button
                 type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute inset-y-0 right-3 flex items-center px-1 text-slate-500 hover:text-slate-900"
-                title={showPassword ? 'Hide password' : 'Show password'}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                onClick={() => {
+                  setShowCreateAccount(true);
+                  setSignupError('');
+                  setSignupMessage('');
+                }}
+                className="w-full h-11 text-slate-700 hover:bg-slate-50 text-sm font-bold rounded-xl btn-outline transition flex items-center justify-center gap-2"
               >
-                <Icon icon={showPassword ? 'mdi:eye-off-outline' : 'mdi:eye-outline'} className="text-lg" />
+                <Icon icon="mdi:account-plus-outline" className="text-base" />
+                <span>Create New Account</span>
               </button>
-            </div>
+            </form>
           </div>
-
-          {error && <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-2xl px-3 py-2">{error}</div>}
-          {signupMessage && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-2xl px-3 py-2">{signupMessage}</div>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full h-11 disabled:opacity-70 text-white text-sm font-bold rounded-xl btn-primary transition flex items-center justify-center gap-2 cursor-pointer"
-          >
-            {loading ? <Icon icon="mdi:loading" className="animate-spin text-base" /> : <><span>Sign In</span><Icon icon="mdi:arrow-right" className="text-base" /></>}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setShowCreateAccount(true);
-              setSignupError('');
-              setSignupMessage('');
-            }}
-            className="w-full h-11 text-slate-700 hover:bg-slate-50 text-sm font-bold rounded-xl btn-outline transition flex items-center justify-center gap-2"
-          >
-            <Icon icon="mdi:account-plus-outline" className="text-base" />
-            <span>Create New Account</span>
-          </button>
-        </form>
+        </div>
       </div>
 
       {showCreateAccount && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 modal-backdrop flex items-center justify-center p-4">
           <form onSubmit={handleCreateAccount} className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -252,9 +254,6 @@ export default function LoginPanel({ onLoginSuccess }) {
           </form>
         </div>
       )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
