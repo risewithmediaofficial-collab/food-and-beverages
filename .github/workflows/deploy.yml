@@ -20,6 +20,6 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd /docker/food-beverages
+            cd /docker/food-and-beverages
             git pull origin main
             docker compose up -d --build
