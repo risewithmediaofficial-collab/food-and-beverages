@@ -196,35 +196,7 @@ export default function Sidebar({ activeModule, user, onLogout, isOpen, onClose,
           )}
         </div>
 
-        {/* User profile strip */}
-        <div className={`border-b border-slate-100 bg-orange-50/60 shrink-0 ${isCollapsed ? 'p-2 flex justify-center' : 'px-4 py-3'}`}>
-          {isCollapsed ? (
-            <div
-              className="w-8 h-8 rounded-xl bg-orange-500 text-white flex items-center justify-center font-extrabold text-xs shadow-sm cursor-pointer"
-              title={`${user?.name || 'Admin'} (${user?.roleName || 'General Manager'})`}
-            >
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-orange-500 text-white flex items-center justify-center font-extrabold text-sm shrink-0 shadow-sm">
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
-              </div>
-              <div className="min-w-0">
-                <span className="text-xs font-bold text-slate-800 block truncate leading-tight">
-                  {user?.name || 'Admin'}
-                </span>
-                <span className="text-[10px] text-orange-600 font-semibold block truncate">
-                  {user?.roleName || 'General Manager'}
-                </span>
-              </div>
-              <div className="ml-auto flex items-center gap-1 shrink-0">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-[9px] text-emerald-600 font-bold">Online</span>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* User profile strip intentionally removed to hide logged-in account */}
 
         {/* Navigation list */}
         <nav className="flex-1 py-3 px-2 overflow-y-auto space-y-1 custom-scrollbar">
