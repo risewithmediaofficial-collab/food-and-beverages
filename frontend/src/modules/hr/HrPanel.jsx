@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { api } from '../../lib/api';
+import { useEffect, useState } from 'react';
 import { Icon } from '@iconify/react';
+import { api } from '../../lib/api';
 import ExportDataToolbar from '../../components/ExportDataToolbar';
 
 const DEPARTMENTS = [
@@ -17,11 +17,23 @@ const DEPARTMENTS = [
 
 const SHIFTS = ['Morning Shift', 'Evening Shift', 'Night Shift', 'General Shift'];
 
+const FALLBACK_ROLES = [
+  { roleName: 'Employee', accessLevel: 'Employee Self Service Portal' },
+  { roleName: 'Line Operator', accessLevel: 'Machine Operations Portal' },
+  { roleName: 'Plant Supervisor', accessLevel: 'Production & Planning Portal' },
+  { roleName: 'Quality Inspector', accessLevel: 'QA Lab & Testing Portal' },
+  { roleName: 'Sales Lead', accessLevel: 'Sales & CRM Portal' },
+  { roleName: 'Inventory Manager', accessLevel: 'Inventory & Warehouse Portal' },
+  { roleName: 'Accounts Specialist', accessLevel: 'Finance & Billing Portal' },
+  { roleName: 'HR Manager', accessLevel: 'HR & Employee Portal' },
+  { roleName: 'General Manager', accessLevel: 'Full System Superadmin' },
+];
+
 const emptyEmployee = {
   name: '',
   username: '',
   password: '',
-  role: '',
+  role: 'Employee',
   department: DEPARTMENTS[2],
   shift: SHIFTS[0],
   phone: '',
@@ -30,27 +42,26 @@ const emptyEmployee = {
   status: 'Active',
 };
 
-export default function HrPanel({ user, triggerError }) {
+export default function HrPanel({ triggerError }) {
   const [employees, setEmployees] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [credModalEmp, setCredModalEmp] = useState(null);
-  const [showPassMap, setShowPassMap] = useState({});
+  const [messageModalEmp, setMessageModalEmp] = useState(null);
   const [newEmp, setNewEmp] = useState(emptyEmployee);
+
+  const roleOptions = roles.length ? roles : FALLBACK_ROLES;
 
   useEffect(() => {
     loadEmployees();
+    loadRoles();
   }, []);
 
   const loadEmployees = async () => {
     try {
       setLoading(true);
       const res = await api.get('/hr/employees');
-      if (res.success && Array.isArray(res.data)) {
-        setEmployees(res.data);
-      } else {
-        setEmployees([]);
-      }
+      setEmployees(res.success && Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.warn('Failed to load employees:', err);
       setEmployees([]);
@@ -59,19 +70,35 @@ export default function HrPanel({ user, triggerError }) {
     }
   };
 
+  const loadRoles = async () => {
+    try {
+      const res = await api.get('/auth/roles');
+      if (res.success && Array.isArray(res.data)) {
+        setRoles(res.data.filter((role) => (role.status || 'Active') === 'Active'));
+      }
+    } catch (err) {
+      console.warn('Failed to load roles:', err);
+    }
+  };
+
   const handleAddEmployee = async (e) => {
     e.preventDefault();
-    const generatedUsername = newEmp.username.trim() || `${newEmp.name.toLowerCase().replace(/\s+/g, '')}@juice-erp.com`;
-    const generatedPassword = newEmp.password.trim() || 'pass123';
-    const employeeId = `EMP-${100 + employees.length + 1}`;
+    const name = newEmp.name.trim();
+    const generatedUsername = newEmp.username.trim() || `${name.toLowerCase().replace(/\s+/g, '')}@juice-erp.com`;
+    const password = newEmp.password.trim();
+
+    if (!password) {
+      if (triggerError) triggerError('Password is required for the new login account');
+      return;
+    }
 
     const payload = {
-      empId: employeeId,
-      name: newEmp.name,
+      empId: `EMP-${100 + employees.length + 1}`,
+      name,
       username: generatedUsername,
-      password: generatedPassword,
+      password,
       email: generatedUsername,
-      designation: newEmp.role || 'Staff Member',
+      designation: newEmp.role,
       department: newEmp.department,
       shift: newEmp.shift,
       phone: newEmp.phone,
@@ -85,7 +112,7 @@ export default function HrPanel({ user, triggerError }) {
       const res = await api.post('/hr/employees', payload);
       if (res.success && res.data) {
         setEmployees([res.data, ...employees]);
-        if (triggerError) triggerError('Employee & Login credentials created successfully!', 'success');
+        if (triggerError) triggerError('Employee and login account created successfully!', 'success');
       } else {
         await loadEmployees();
       }
@@ -123,29 +150,23 @@ export default function HrPanel({ user, triggerError }) {
     }
   };
 
-  const toggleShowPassword = (empId) => {
-    setShowPassMap((prev) => ({ ...prev, [empId]: !prev[empId] }));
-  };
-
-  const copyCredMessage = (emp) => {
-    const username = emp.username || emp.email || emp.name.toLowerCase().replace(/\s+/g, '') + '@juice-erp.com';
-    const password = emp.password || 'password123';
-    const text = `Hello ${emp.name},\nYour JuiceFlow ERP account has been created!\n\n🔹 Username/Email: ${username}\n🔑 Password: ${password}\n🏢 Role: ${emp.designation || emp.role}\n🏬 Department: ${emp.department}\n🌐 Portal Link: ${window.location.origin}\n\nPlease log in and update your password if needed.`;
+  const copyLoginMessage = (emp) => {
+    const username = emp.username || emp.email || `${emp.name.toLowerCase().replace(/\s+/g, '')}@juice-erp.com`;
+    const text = `Hello ${emp.name},\nYour JuiceFlow ERP account has been created.\n\nUsername/Email: ${username}\nRole: ${emp.designation || emp.role}\nDepartment: ${emp.department}\nPortal Link: ${window.location.origin}\n\nUse the password shared by your administrator.`;
     navigator.clipboard.writeText(text);
-    if (triggerError) triggerError('Login credentials copied to clipboard!', 'success');
+    if (triggerError) triggerError('Login message copied to clipboard!', 'success');
   };
 
   return (
     <div className="space-y-5 font-sans">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
         <div>
           <h2 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
             <Icon icon="mdi:account-badge-outline" className="text-orange-500 text-base" />
-            Employee Master & Credentials
+            Employee Master & Access
           </h2>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            Manage employee directory, manual additions, and send login credentials (username & password)
+            Manage employee directory, role/designation assignment, and ERP login access
           </p>
         </div>
 
@@ -168,7 +189,6 @@ export default function HrPanel({ user, triggerError }) {
         </div>
       </div>
 
-      {/* Main Employee Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
         {loading ? (
           <div className="p-10 text-center text-slate-400 text-sm">Loading employees...</div>
@@ -177,7 +197,7 @@ export default function HrPanel({ user, triggerError }) {
             <Icon icon="mdi:account-group-outline" className="text-5xl text-slate-300" />
             <p className="text-sm font-bold text-slate-600">No Employees Found</p>
             <p className="text-xs text-slate-400 text-center max-w-sm">
-              The employee directory is currently empty. Click <span className="font-semibold text-slate-600">+ Add New Employee</span> above to add employees manually and generate login credentials.
+              The employee directory is currently empty. Add employees manually and assign the correct ERP role.
             </p>
             <button
               onClick={() => { setNewEmp(emptyEmployee); setShowAddModal(true); }}
@@ -188,7 +208,7 @@ export default function HrPanel({ user, triggerError }) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-700 min-w-[850px]">
+            <table className="w-full text-left text-xs text-slate-700 min-w-[780px]">
               <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase tracking-widest border-b border-slate-200 text-[10px]">
                 <tr>
                   <th className="p-4">Emp ID</th>
@@ -196,7 +216,6 @@ export default function HrPanel({ user, triggerError }) {
                   <th className="p-4">Role / Designation</th>
                   <th className="p-4">Department</th>
                   <th className="p-4">Login Username / Email</th>
-                  <th className="p-4">Password</th>
                   <th className="p-4">Status</th>
                   <th className="p-4 text-right">Actions</th>
                 </tr>
@@ -205,8 +224,6 @@ export default function HrPanel({ user, triggerError }) {
                 {employees.map((emp) => {
                   const empIdKey = emp._id || emp.id || emp.empId;
                   const username = emp.username || emp.email || `${emp.name.toLowerCase().replace(/\s+/g, '')}@juice-erp.com`;
-                  const password = emp.password || 'password123';
-                  const isPassVisible = showPassMap[empIdKey];
 
                   return (
                     <tr key={empIdKey} className="hover:bg-slate-50/60 transition">
@@ -219,21 +236,9 @@ export default function HrPanel({ user, triggerError }) {
                           <span>{emp.name}</span>
                         </div>
                       </td>
-                      <td className="p-4 font-semibold text-slate-700">{emp.designation || emp.role || 'Staff'}</td>
+                      <td className="p-4 font-semibold text-slate-700">{emp.designation || emp.role || 'Employee'}</td>
                       <td className="p-4 text-slate-500">{emp.department || 'Operations'}</td>
                       <td className="p-4 font-mono text-orange-600 font-medium">{username}</td>
-                      <td className="p-4 font-mono text-slate-600">
-                        <div className="flex items-center gap-1.5">
-                          <span>{isPassVisible ? password : '••••••••'}</span>
-                          <button
-                            onClick={() => toggleShowPassword(empIdKey)}
-                            className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-                            title={isPassVisible ? 'Hide Password' : 'Show Password'}
-                          >
-                            <Icon icon={isPassVisible ? 'mdi:eye-off-outline' : 'mdi:eye-outline'} className="text-sm" />
-                          </button>
-                        </div>
-                      </td>
                       <td className="p-4">
                         <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
                           {emp.status || 'Active'}
@@ -242,11 +247,11 @@ export default function HrPanel({ user, triggerError }) {
                       <td className="p-4 text-right">
                         <div className="flex gap-1.5 justify-end">
                           <button
-                            onClick={() => setCredModalEmp(emp)}
+                            onClick={() => setMessageModalEmp(emp)}
                             className="px-2.5 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
-                            title="View & Send Login Credentials"
+                            title="Copy Login Message"
                           >
-                            <Icon icon="mdi:send-outline" className="text-xs" /> Send Creds
+                            <Icon icon="mdi:send-outline" className="text-xs" /> Login Msg
                           </button>
                           <button
                             onClick={() => handleDeleteEmployee(emp._id || emp.id)}
@@ -266,14 +271,13 @@ export default function HrPanel({ user, triggerError }) {
         )}
       </div>
 
-      {/* Add Employee Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center p-5 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-extrabold text-slate-900">Add New Employee Profile</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">Creates employee record and generates user login account</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Assign a role/designation and create the login account</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-slate-100 rounded-xl transition cursor-pointer">
                 <Icon icon="mdi:close" className="text-base text-slate-500" />
@@ -295,14 +299,21 @@ export default function HrPanel({ user, triggerError }) {
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Role / Designation *</label>
-                  <input
-                    type="text"
+                  <select
                     required
-                    placeholder="e.g. Production Supervisor"
                     value={newEmp.role}
                     onChange={(e) => setNewEmp({ ...newEmp, role: e.target.value })}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                  />
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white"
+                  >
+                    {roleOptions.map((role) => {
+                      const roleName = role.roleName || role.name;
+                      return (
+                        <option key={role._id || roleName} value={roleName}>
+                          {roleName} - {role.accessLevel || 'Custom Access'}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
               </div>
 
@@ -329,18 +340,17 @@ export default function HrPanel({ user, triggerError }) {
                 </div>
               </div>
 
-              {/* Login Credentials Section */}
               <div className="bg-orange-50/70 border border-orange-200/80 rounded-xl p-4 space-y-3">
                 <div className="flex items-center gap-1.5 text-orange-800 font-bold text-xs">
                   <Icon icon="mdi:shield-key-outline" className="text-base text-orange-600" />
-                  <span>Login Credentials (For ERP Access)</span>
+                  <span>Login Access</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Username / Email *</label>
                     <input
-                      type="text"
+                      type="email"
                       required
                       placeholder="rahul@juice-erp.com"
                       value={newEmp.username}
@@ -349,11 +359,11 @@ export default function HrPanel({ user, triggerError }) {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Password *</label>
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Initial Password *</label>
                     <input
-                      type="text"
+                      type="password"
                       required
-                      placeholder="e.g. Pass@1234"
+                      placeholder="Set initial password"
                       value={newEmp.password}
                       onChange={(e) => setNewEmp({ ...newEmp, password: e.target.value })}
                       className="w-full border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 font-mono"
@@ -374,7 +384,7 @@ export default function HrPanel({ user, triggerError }) {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Basic Salary (₹)</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Basic Salary</label>
                   <input
                     type="number"
                     placeholder="25000"
@@ -406,49 +416,45 @@ export default function HrPanel({ user, triggerError }) {
         </div>
       )}
 
-      {/* Send Credentials Modal */}
-      {credModalEmp && (
+      {messageModalEmp && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
             <div className="flex justify-between items-center p-5 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Icon icon="mdi:send-outline" className="text-orange-500 text-lg" />
-                <h3 className="text-sm font-extrabold text-slate-900">Send Login Credentials</h3>
+                <h3 className="text-sm font-extrabold text-slate-900">Login Message</h3>
               </div>
-              <button onClick={() => setCredModalEmp(null)} className="p-1.5 hover:bg-slate-100 rounded-xl transition cursor-pointer">
+              <button onClick={() => setMessageModalEmp(null)} className="p-1.5 hover:bg-slate-100 rounded-xl transition cursor-pointer">
                 <Icon icon="mdi:close" className="text-base text-slate-500" />
               </button>
             </div>
 
             <div className="p-5 space-y-4">
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
-                <div className="text-xs font-bold text-slate-800">{credModalEmp.name}</div>
-                <div className="text-xs text-slate-500">{credModalEmp.designation || credModalEmp.role} · {credModalEmp.department}</div>
-                <div className="pt-2 border-t border-slate-200 flex flex-col gap-1 text-xs font-mono">
-                  <div><span className="text-slate-400">Username:</span> <span className="font-bold text-orange-600">{credModalEmp.username || credModalEmp.email || '—'}</span></div>
-                  <div><span className="text-slate-400">Password:</span> <span className="font-bold text-slate-800">{credModalEmp.password || 'password123'}</span></div>
+                <div className="text-xs font-bold text-slate-800">{messageModalEmp.name}</div>
+                <div className="text-xs text-slate-500">{messageModalEmp.designation || messageModalEmp.role} - {messageModalEmp.department}</div>
+                <div className="pt-2 border-t border-slate-200 text-xs font-mono">
+                  <span className="text-slate-400">Username:</span>{' '}
+                  <span className="font-bold text-orange-600">{messageModalEmp.username || messageModalEmp.email || '-'}</span>
                 </div>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Pre-formatted Credentials Message</label>
-                <textarea
-                  readOnly
-                  rows={6}
-                  value={`Hello ${credModalEmp.name},\nYour JuiceFlow ERP account credentials:\n\n🔹 Username: ${credModalEmp.username || credModalEmp.email || '—'}\n🔑 Password: ${credModalEmp.password || 'password123'}\n🏢 Role: ${credModalEmp.designation || credModalEmp.role}\n🏬 Department: ${credModalEmp.department}\n🌐 Portal Link: ${window.location.origin}\n\nPlease log in and change your password.`}
-                  className="w-full border border-slate-200 rounded-xl p-3 text-xs font-mono bg-slate-50 text-slate-700 resize-none"
-                />
-              </div>
+              <textarea
+                readOnly
+                rows={6}
+                value={`Hello ${messageModalEmp.name},\nYour JuiceFlow ERP account has been created.\n\nUsername: ${messageModalEmp.username || messageModalEmp.email || '-'}\nRole: ${messageModalEmp.designation || messageModalEmp.role}\nDepartment: ${messageModalEmp.department}\nPortal Link: ${window.location.origin}\n\nUse the password shared by your administrator.`}
+                className="w-full border border-slate-200 rounded-xl p-3 text-xs font-mono bg-slate-50 text-slate-700 resize-none"
+              />
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => copyCredMessage(credModalEmp)}
+                  onClick={() => copyLoginMessage(messageModalEmp)}
                   className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                 >
-                  <Icon icon="mdi:content-copy" className="text-base" /> Copy Credential Message
+                  <Icon icon="mdi:content-copy" className="text-base" /> Copy Message
                 </button>
                 <button
-                  onClick={() => setCredModalEmp(null)}
+                  onClick={() => setMessageModalEmp(null)}
                   className="px-4 border border-slate-200 text-slate-600 text-xs font-bold py-2.5 rounded-xl hover:bg-slate-50 transition cursor-pointer"
                 >
                   Close

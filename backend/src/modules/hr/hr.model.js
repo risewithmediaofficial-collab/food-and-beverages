@@ -5,7 +5,7 @@ const employeeSchema = new mongoose.Schema({
   rfidCardNo: { type: String, default: '' },
   name: { type: String, required: true },
   username: { type: String },
-  password: { type: String },
+  password: { type: String, select: false },
   photoUrl: String,
   department: { type: String, required: true },
   designation: { type: String, required: true },

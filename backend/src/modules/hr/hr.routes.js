@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import { Employee, RFIDAttendanceLog, RFIDDevice, Shift } from './hr.model.js';
 import { User } from '../auth/auth.model.js';
+import { resolveRoleAccess } from '../auth/auth.routes.js';
 
 const router = express.Router();
 
@@ -19,7 +20,7 @@ router.delete('/employees/all', async (req, res) => {
 
 router.get('/employees', async (req, res) => {
   try {
-    const employees = await Employee.find({ isActive: true }).sort({ createdAt: -1 });
+    const employees = await Employee.find({ isActive: true }).select('-password').sort({ createdAt: -1 });
     res.json({ success: true, data: employees });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -29,14 +30,15 @@ router.get('/employees', async (req, res) => {
 router.post('/employees', async (req, res) => {
   try {
     const { empId, name, username, password, email, designation, department, shift, rfidCardNo, phone, basicSalary, status } = req.body;
+    const loginPassword = password || `Jf@${Math.floor(100000 + Math.random() * 900000)}`;
+    const roleAccess = await resolveRoleAccess(designation || 'Employee');
 
     const empData = {
       empId: empId || `EMP-${Date.now().toString().slice(-4)}`,
       name,
       username: username || email || name.toLowerCase().replace(/\s+/g, '') + '@juice-erp.com',
-      password: password || 'password123',
       email: email || username || name.toLowerCase().replace(/\s+/g, '') + '@juice-erp.com',
-      designation: designation || 'Staff',
+      designation: roleAccess.roleName,
       department: department || 'Plant Operations',
       shift: shift || 'Morning Shift',
       rfidCardNo: rfidCardNo || `RF-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -53,14 +55,16 @@ router.post('/employees', async (req, res) => {
       const userEmail = empData.username.includes('@') ? empData.username : `${empData.username}@juice-erp.com`;
       const existingUser = await User.findOne({ email: userEmail });
       if (!existingUser) {
-        const passwordHash = await bcrypt.hash(empData.password, 10);
+        const passwordHash = await bcrypt.hash(loginPassword, 10);
         await User.create({
           email: userEmail,
           passwordHash,
           name: empData.name,
           department: empData.department,
-          roleName: empData.designation,
-          role: empData.designation,
+          roleId: roleAccess.roleId,
+          roleName: roleAccess.roleName,
+          role: roleAccess.roleName,
+          permissions: roleAccess.permissions,
           empId: empData.empId,
           status: 'Active',
           isActive: true,
@@ -70,7 +74,9 @@ router.post('/employees', async (req, res) => {
       console.warn('[HR Warning] Could not auto-create User login account:', userErr.message);
     }
 
-    res.status(201).json({ success: true, data: emp });
+    const safeEmployee = emp.toObject();
+    delete safeEmployee.password;
+    res.status(201).json({ success: true, data: safeEmployee });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }

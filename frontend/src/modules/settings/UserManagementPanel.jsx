@@ -5,6 +5,7 @@ import { api } from '../../lib/api';
 
 export default function UserManagementPanel({ user, triggerError }) {
   const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -12,16 +13,31 @@ export default function UserManagementPanel({ user, triggerError }) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    role: 'General Manager',
+    role: 'Employee',
     department: 'Executive',
     plant: 'Nashik Facility #1',
-    password: 'password123',
+    password: '',
     status: 'Active',
   });
 
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
   }, []);
+
+  const roleOptions = roles.length
+    ? roles
+    : [
+      { roleName: 'Employee', accessLevel: 'Employee Self Service Portal' },
+      { roleName: 'Line Operator', accessLevel: 'Machine Operations Portal' },
+      { roleName: 'Plant Supervisor', accessLevel: 'Production & Planning Portal' },
+      { roleName: 'Quality Inspector', accessLevel: 'QA Lab & Testing Portal' },
+      { roleName: 'Sales Lead', accessLevel: 'Sales & CRM Portal' },
+      { roleName: 'Inventory Manager', accessLevel: 'Inventory & Warehouse Portal' },
+      { roleName: 'Accounts Specialist', accessLevel: 'Finance & Billing Portal' },
+      { roleName: 'HR Manager', accessLevel: 'HR & Employee Portal' },
+      { roleName: 'General Manager', accessLevel: 'Full System Superadmin' },
+    ];
 
   const fetchUsers = async () => {
     try {
@@ -40,6 +56,17 @@ export default function UserManagementPanel({ user, triggerError }) {
     }
   };
 
+  const fetchRoles = async () => {
+    try {
+      const res = await api.get('/auth/roles');
+      if (res.success && Array.isArray(res.data)) {
+        setRoles(res.data.filter((role) => (role.status || 'Active') === 'Active'));
+      }
+    } catch (err) {
+      console.warn('Unable to load roles from API:', err);
+    }
+  };
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
@@ -48,7 +75,7 @@ export default function UserManagementPanel({ user, triggerError }) {
       if (res.success && res.data) {
         setUsers([res.data, ...users]);
         setShowAddModal(false);
-        setFormData({ name: '', email: '', role: 'General Manager', department: 'Executive', plant: 'Nashik Facility #1', password: 'password123', status: 'Active' });
+        setFormData({ name: '', email: '', role: 'Employee', department: 'Executive', plant: 'Nashik Facility #1', password: '', status: 'Active' });
         if (triggerError) triggerError('User account created successfully!', 'success');
       }
     } catch (err) {
@@ -116,7 +143,7 @@ export default function UserManagementPanel({ user, triggerError }) {
           <ExportDataToolbar data={users} filename="user_accounts_directory" title="System User Accounts" />
           <button
             onClick={() => {
-              setFormData({ name: '', email: '', role: 'General Manager', department: 'Executive', plant: 'Nashik Facility #1', password: 'password123', status: 'Active' });
+              setFormData({ name: '', email: '', role: 'Employee', department: 'Executive', plant: 'Nashik Facility #1', password: '', status: 'Active' });
               setShowAddModal(true);
             }}
             className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-orange-500/20 cursor-pointer"
@@ -169,7 +196,7 @@ export default function UserManagementPanel({ user, triggerError }) {
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Default: password123"
+                  placeholder="Set initial password"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
                 />
               </div>
@@ -182,12 +209,14 @@ export default function UserManagementPanel({ user, triggerError }) {
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
               >
-                <option value="General Manager">General Manager (Superadmin)</option>
-                <option value="Sales Lead">Sales Lead</option>
-                <option value="Plant Supervisor">Plant Supervisor</option>
-                <option value="Line Operator">Line Operator</option>
-                <option value="Quality Inspector">Quality Inspector</option>
-                <option value="Accounts Specialist">Accounts Specialist</option>
+                {roleOptions.map((role) => {
+                  const roleName = role.roleName || role.name;
+                  return (
+                    <option key={role._id || roleName} value={roleName}>
+                      {roleName} - {role.accessLevel || 'Custom Access'}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -253,7 +282,7 @@ export default function UserManagementPanel({ user, triggerError }) {
           <p className="text-xs text-slate-400 max-w-sm mx-auto">There are no user accounts created in the system directory. Click below to add a new user.</p>
           <button
             onClick={() => {
-              setFormData({ name: '', email: '', role: 'General Manager', department: 'Executive', plant: 'Nashik Facility #1', password: 'password123', status: 'Active' });
+              setFormData({ name: '', email: '', role: 'Employee', department: 'Executive', plant: 'Nashik Facility #1', password: '', status: 'Active' });
               setShowAddModal(true);
             }}
             className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-2 cursor-pointer shadow-sm"

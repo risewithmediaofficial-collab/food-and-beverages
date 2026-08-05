@@ -14,13 +14,13 @@ const DEPARTMENT_PRESETS = [
 
 export default function LoginPanel({ onLoginSuccess }) {
   const [selectedEmail, setSelectedEmail] = useState('admin@juice-erp.com');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSelectPreset = (preset) => {
     setSelectedEmail(preset.email);
-    setPassword('password123');
+    setPassword('');
   };
 
   const handleSubmit = async (e) => {
@@ -31,7 +31,7 @@ export default function LoginPanel({ onLoginSuccess }) {
     const preset = DEPARTMENT_PRESETS.find(p => p.email === selectedEmail) || DEPARTMENT_PRESETS[0];
 
     try {
-      const res = await api.post('/auth/login', { email: selectedEmail, password: password || 'password123' });
+      const res = await api.post('/auth/login', { email: selectedEmail, password });
       if (res.success && res.accessToken) {
         localStorage.setItem('access_token', res.accessToken);
         localStorage.setItem('user', JSON.stringify(res.user));

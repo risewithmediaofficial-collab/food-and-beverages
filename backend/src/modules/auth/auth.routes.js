@@ -15,12 +15,35 @@ export const DEPARTMENT_PRESETS = [
 ];
 
 export const DEFAULT_ROLES = [
-  { name: 'General Manager (Executive)', roleName: 'General Manager (Executive)', accessLevel: 'Full System Superadmin', permissions: ['ALL_MODULES_FULL_ACCESS', '*'], activeUsers: 1, status: 'Active' },
-  { name: 'Sales Lead', roleName: 'Sales Lead', accessLevel: 'Sales & CRM Portal', permissions: ['CRM', 'SALES', 'CUSTOMERS', 'LEADS', 'INVOICES'], activeUsers: 2, status: 'Active' },
-  { name: 'Plant Supervisor', roleName: 'Plant Supervisor', accessLevel: 'Production & Planning Portal', permissions: ['PRODUCTION', 'BATCHES', 'RECIPE', 'PLANNING'], activeUsers: 3, status: 'Active' },
-  { name: 'Machine Operator', roleName: 'Machine Operator', accessLevel: 'Machine Control & SCADA', permissions: ['MACHINE', 'MACHINE_OPERATION'], activeUsers: 5, status: 'Active' },
-  { name: 'Quality Inspector', roleName: 'Quality Inspector', accessLevel: 'QA Lab & Testing Portal', permissions: ['QUALITY', 'LABORATORY', 'PACKAGING'], activeUsers: 2, status: 'Active' },
+  { name: 'General Manager', roleName: 'General Manager', accessLevel: 'Full System Superadmin', permissions: ['*', 'ALL_MODULES_FULL_ACCESS'], activeUsers: 1, status: 'Active' },
+  { name: 'Sales Lead', roleName: 'Sales Lead', accessLevel: 'Sales & CRM Portal', permissions: ['DASHBOARD', 'CRM', 'SALES', 'CUSTOMERS', 'LEADS', 'INVOICES', 'REPORTS'], activeUsers: 2, status: 'Active' },
+  { name: 'Plant Supervisor', roleName: 'Plant Supervisor', accessLevel: 'Production & Planning Portal', permissions: ['DASHBOARD', 'PRODUCTION', 'BATCHES', 'RECIPES', 'PLANNING', 'MACHINE', 'QUALITY'], activeUsers: 3, status: 'Active' },
+  { name: 'Line Operator', roleName: 'Line Operator', accessLevel: 'Machine Operations Portal', permissions: ['DASHBOARD', 'MACHINE', 'MACHINE_OPERATION', 'PRODUCTION'], activeUsers: 5, status: 'Active' },
+  { name: 'Quality Inspector', roleName: 'Quality Inspector', accessLevel: 'QA Lab & Testing Portal', permissions: ['DASHBOARD', 'QUALITY', 'LABORATORY', 'PACKAGING', 'BATCHES'], activeUsers: 2, status: 'Active' },
+  { name: 'Accounts Specialist', roleName: 'Accounts Specialist', accessLevel: 'Finance & Billing Portal', permissions: ['DASHBOARD', 'FINANCE', 'SALES', 'INVOICES', 'PAYMENTS', 'REPORTS'], activeUsers: 1, status: 'Active' },
+  { name: 'Inventory Manager', roleName: 'Inventory Manager', accessLevel: 'Inventory & Warehouse Portal', permissions: ['DASHBOARD', 'INVENTORY', 'WAREHOUSE', 'PURCHASE', 'SUPPLIERS', 'DISPATCH'], activeUsers: 1, status: 'Active' },
+  { name: 'HR Manager', roleName: 'HR Manager', accessLevel: 'HR & Employee Portal', permissions: ['DASHBOARD', 'EMPLOYEES', 'ATTENDANCE', 'SHIFTS', 'LEAVES', 'PAYROLL'], activeUsers: 1, status: 'Active' },
+  { name: 'Employee', roleName: 'Employee', accessLevel: 'Employee Self Service Portal', permissions: ['DASHBOARD', 'ATTENDANCE', 'LEAVES'], activeUsers: 1, status: 'Active' },
 ];
+
+export const resolveRoleAccess = async (roleName) => {
+  const fallbackName = roleName || 'Employee';
+  let role = await Role.findOne({
+    $or: [{ roleName: fallbackName }, { name: fallbackName }],
+    status: 'Active',
+  });
+
+  if (!role) {
+    const preset = DEFAULT_ROLES.find(r => r.roleName === fallbackName || r.name === fallbackName);
+    role = preset ? await Role.create(preset) : null;
+  }
+
+  return {
+    roleId: role?._id,
+    roleName: role?.roleName || role?.name || fallbackName,
+    permissions: Array.isArray(role?.permissions) && role.permissions.length ? role.permissions : ['DASHBOARD'],
+  };
+};
 
 export const ensureDefaultUsers = async () => {
   try {
@@ -44,10 +67,11 @@ export const ensureDefaultUsers = async () => {
     }
 
     for (const r of DEFAULT_ROLES) {
-      const exists = await Role.findOne({ name: r.name });
-      if (!exists) {
-        await Role.create(r);
-      }
+      await Role.findOneAndUpdate(
+        { name: r.name },
+        { $setOnInsert: r },
+        { upsert: true, new: true },
+      );
     }
     console.log('[Auth] Default department user accounts & roles initialized.');
   } catch (err) {
@@ -90,14 +114,15 @@ router.post('/login', async (req, res) => {
       }
     }
 
+    const roleAccess = await resolveRoleAccess(user.roleName || user.role);
     const payload = {
       id: user._id.toString(),
       name: user.name,
       email: user.email,
-      roleName: user.roleName || user.role || 'General Manager',
+      roleName: roleAccess.roleName,
       department: user.department || 'Executive',
       factoryId: user.factoryId,
-      role: { name: user.roleName || user.role || 'General Manager', permissions: user.permissions || ['all', '*'] },
+      role: { name: roleAccess.roleName, permissions: user.permissions?.length ? user.permissions : roleAccess.permissions },
     };
 
     const accessToken = jwt.sign(payload, config.jwtSecret, { expiresIn: '8h' });
@@ -119,10 +144,10 @@ router.get('/me', (req, res) => {
 // Users Management APIs
 router.get('/users', async (req, res) => {
   try {
-    let users = await User.find({}).sort({ createdAt: -1 });
+    let users = await User.find({}).select('-passwordHash').sort({ createdAt: -1 });
     if (!users || users.length === 0) {
       await ensureDefaultUsers();
-      users = await User.find({}).sort({ createdAt: -1 });
+      users = await User.find({}).select('-passwordHash').sort({ createdAt: -1 });
     }
     res.json({ success: true, data: users });
   } catch (err) {
@@ -136,21 +161,29 @@ router.post('/users', async (req, res) => {
     if (!name || !email) {
       return res.status(400).json({ success: false, message: 'Name and email are required.' });
     }
-    const passwordHash = await bcrypt.hash(password || 'password123', 10);
+    if (!password) {
+      return res.status(400).json({ success: false, message: 'Password is required for new user accounts.' });
+    }
+    const roleAccess = await resolveRoleAccess(role);
+    const passwordHash = await bcrypt.hash(password, 10);
     const count = await User.countDocuments();
     const newUser = await User.create({
       empId: empId || `EMP-${101 + count}`,
       name,
       email,
       passwordHash,
-      roleName: role || 'General Manager',
-      role: role || 'General Manager',
+      roleId: roleAccess.roleId,
+      roleName: roleAccess.roleName,
+      role: roleAccess.roleName,
+      permissions: roleAccess.permissions,
       department: department || 'Executive',
       plant: plant || 'Nashik Facility #1',
       status: 'Active',
       isActive: true,
     });
-    res.status(201).json({ success: true, data: newUser, message: 'User created successfully' });
+    const safeUser = newUser.toObject();
+    delete safeUser.passwordHash;
+    res.status(201).json({ success: true, data: safeUser, message: 'User created successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -158,7 +191,19 @@ router.post('/users', async (req, res) => {
 
 router.put('/users/:id', async (req, res) => {
   try {
-    const updated = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updates = { ...req.body };
+    delete updates.password;
+    delete updates.passwordHash;
+
+    if (updates.role || updates.roleName) {
+      const roleAccess = await resolveRoleAccess(updates.role || updates.roleName);
+      updates.roleId = roleAccess.roleId;
+      updates.roleName = roleAccess.roleName;
+      updates.role = roleAccess.roleName;
+      updates.permissions = roleAccess.permissions;
+    }
+
+    const updated = await User.findByIdAndUpdate(req.params.id, updates, { new: true }).select('-passwordHash');
     res.json({ success: true, data: updated, message: 'User updated successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -227,4 +272,3 @@ router.delete('/roles/:id', async (req, res) => {
 });
 
 export default router;
-
