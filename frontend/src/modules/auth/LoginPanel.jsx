@@ -79,13 +79,10 @@ export default function LoginPanel({ onLoginSuccess }) {
 
   return (
     <div className="min-h-screen bg-[#f6f8fb] flex items-center justify-center px-4 py-8 font-sans text-slate-900">
-      <div
-        className="w-full bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-200/60 overflow-hidden"
-        style={{ maxWidth: '420px' }}
-      >
-        <div className="px-6 pt-6 pb-5 border-b border-slate-100">
+      <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-200/60 overflow-hidden auth-card">
+        <div className="auth-header">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+            <div className="brand-badge bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 shrink-0">
               <Icon icon="mdi:fruit-citrus" className="text-2xl" />
             </div>
             <div className="min-w-0">
@@ -137,8 +134,7 @@ export default function LoginPanel({ onLoginSuccess }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-11 disabled:opacity-70 text-white text-sm font-bold rounded-xl shadow-lg shadow-orange-500/25 transition flex items-center justify-center gap-2 cursor-pointer hover:brightness-95"
-            style={{ backgroundColor: '#ea580c', color: '#ffffff' }}
+            className="w-full h-11 disabled:opacity-70 text-white text-sm font-bold rounded-xl btn-primary transition flex items-center justify-center gap-2 cursor-pointer"
           >
             {loading ? <Icon icon="mdi:loading" className="animate-spin text-base" /> : <><span>Sign In</span><Icon icon="mdi:arrow-right" className="text-base" /></>}
           </button>
@@ -150,7 +146,7 @@ export default function LoginPanel({ onLoginSuccess }) {
               setSignupError('');
               setSignupMessage('');
             }}
-            className="w-full h-11 border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 text-sm font-bold rounded-xl transition flex items-center justify-center gap-2"
+            className="w-full h-11 text-slate-700 hover:bg-slate-50 text-sm font-bold rounded-xl btn-outline transition flex items-center justify-center gap-2"
           >
             <Icon icon="mdi:account-plus-outline" className="text-base" />
             <span>Create New Account</span>

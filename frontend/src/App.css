@@ -5,7 +5,7 @@
 /* Base Body Styles */
 body {
   margin: 0;
-  background-color: #f8fafc;
+  background: radial-gradient(1200px 600px at 10% 10%, #fffaf0 0%, rgba(234,88,12,0.03) 6%, rgba(99,102,241,0.02) 18%, transparent 40%), linear-gradient(180deg, #f8fafc 0%, #f6f8fb 100%);
   color: #0f172a;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -28,4 +28,37 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* Auth card refinements */
+.auth-card {
+  max-width: 420px;
+  border-radius: 1rem; /* 16px */
+  overflow: hidden;
+}
+
+.auth-header {
+  padding: 1.5rem 1.5rem 1.25rem;
+  border-bottom: 1px solid rgba(15,23,42,0.04);
+}
+
+.brand-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.btn-primary {
+  background: linear-gradient(90deg,#ea580c,#f97316);
+  color: white !important;
+  box-shadow: 0 6px 18px rgba(234,88,12,0.12);
+}
+
+.btn-outline {
+  border: 1px solid rgba(15,23,42,0.06);
+  background: transparent;
+}
+
+.modal-backdrop {
+  backdrop-filter: blur(4px);
 }
