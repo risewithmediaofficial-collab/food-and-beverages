@@ -26,6 +26,23 @@ export const DEFAULT_ROLES = [
   { name: 'Employee', roleName: 'Employee', accessLevel: 'Employee Self Service Portal', permissions: ['DASHBOARD', 'ATTENDANCE', 'LEAVES'], activeUsers: 1, status: 'Active' },
 ];
 
+const withMandatoryPermissions = (permissions = []) => {
+  const normalized = new Set(
+    permissions.map((permission) => String(permission).trim().toUpperCase()).filter(Boolean),
+  );
+  normalized.add('DASHBOARD');
+  normalized.add('ATTENDANCE');
+  return Array.from(normalized);
+};
+
+const parsePermissions = (permissions) => {
+  if (Array.isArray(permissions)) return permissions;
+  if (typeof permissions === 'string') {
+    return permissions.split(',').map((permission) => permission.trim()).filter(Boolean);
+  }
+  return [];
+};
+
 export const resolveRoleAccess = async (roleName) => {
   const fallbackName = roleName || 'Employee';
   let role = await Role.findOne({
@@ -41,7 +58,9 @@ export const resolveRoleAccess = async (roleName) => {
   return {
     roleId: role?._id,
     roleName: role?.roleName || role?.name || fallbackName,
-    permissions: Array.isArray(role?.permissions) && role.permissions.length ? role.permissions : ['DASHBOARD'],
+    permissions: withMandatoryPermissions(
+      Array.isArray(role?.permissions) && role.permissions.length ? role.permissions : ['DASHBOARD'],
+    ),
   };
 };
 
@@ -122,7 +141,7 @@ router.post('/login', async (req, res) => {
       roleName: roleAccess.roleName,
       department: user.department || 'Executive',
       factoryId: user.factoryId,
-      role: { name: roleAccess.roleName, permissions: user.permissions?.length ? user.permissions : roleAccess.permissions },
+      role: { name: roleAccess.roleName, permissions: withMandatoryPermissions(user.permissions?.length ? user.permissions : roleAccess.permissions) },
     };
 
     const accessToken = jwt.sign(payload, config.jwtSecret, { expiresIn: '8h' });
@@ -243,7 +262,7 @@ router.post('/roles', async (req, res) => {
       name: roleName,
       roleName,
       accessLevel: accessLevel || 'Custom Scope Portal',
-      permissions: Array.isArray(permissions) ? permissions : (permissions ? permissions.split(',').map(s => s.trim()) : ['READ_ONLY']),
+      permissions: withMandatoryPermissions(parsePermissions(permissions).length ? parsePermissions(permissions) : ['READ_ONLY']),
       activeUsers: 1,
       status: status || 'Active',
     });
@@ -255,7 +274,11 @@ router.post('/roles', async (req, res) => {
 
 router.put('/roles/:id', async (req, res) => {
   try {
-    const updated = await Role.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const updates = { ...req.body };
+    if (Object.prototype.hasOwnProperty.call(updates, 'permissions')) {
+      updates.permissions = withMandatoryPermissions(parsePermissions(updates.permissions));
+    }
+    const updated = await Role.findByIdAndUpdate(req.params.id, updates, { new: true });
     res.json({ success: true, data: updated, message: 'Role updated successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

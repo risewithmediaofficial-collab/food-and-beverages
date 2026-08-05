@@ -7,6 +7,7 @@ import {
   ResponsiveContainer, BarChart, Bar, CartesianGrid
 } from 'recharts';
 import { Icon } from '@iconify/react';
+import { canAccessModule, isAdminUser } from '../../accessControl';
 
 const fmt = (n) => (n ?? 0).toLocaleString('en-IN');
 const fmtCurr = (n) => `₹${((n ?? 0) / 1000).toFixed(1)}K`;
@@ -52,6 +53,22 @@ const PIPELINE_STAGES = [
   { id: 'production', label: 'Production Batches', icon: 'mdi:flask-outline', color: 'bg-amber-500', key: 'activeProductionOrders' },
   { id: 'quality', label: 'QC Checks', icon: 'mdi:shield-check-outline', color: 'bg-purple-500', key: 'totalQCChecks' },
   { id: 'dispatch', label: 'Active Dispatches', icon: 'mdi:truck-delivery-outline', color: 'bg-emerald-500', key: 'activeDispatches' },
+];
+
+const ROLE_DASHBOARD_TILES = [
+  { id: 'rfid_attendance', label: 'Attendance', description: 'View RFID attendance records', icon: 'mdi:card-account-details-outline', path: '/rfid_attendance', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+  { id: 'leaves', label: 'Leave Management', description: 'Apply and review leave records', icon: 'mdi:calendar-multiselect', path: '/leaves', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { id: 'employees', label: 'Employee Master', description: 'Manage employee profiles and access', icon: 'mdi:account-badge-outline', path: '/employees', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  { id: 'sales', label: 'Sales & Invoices', description: 'Manage orders and collections', icon: 'mdi:cart-outline', path: '/sales', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { id: 'crm', label: 'CRM', description: 'Track leads and customers', icon: 'mdi:bullseye-arrow', path: '/crm', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { id: 'inventory', label: 'Inventory', description: 'Monitor stock and movement', icon: 'mdi:package-variant-closed', path: '/inventory', color: 'bg-teal-50 text-teal-700 border-teal-200' },
+  { id: 'purchase', label: 'Purchase', description: 'Manage purchase orders', icon: 'mdi:dolly', path: '/purchase', color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+  { id: 'production', label: 'Production', description: 'Track production orders', icon: 'mdi:cogs', path: '/production', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+  { id: 'machine', label: 'Machines', description: 'Machine status and operations', icon: 'mdi:robot-industrial', path: '/machine', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  { id: 'quality', label: 'Quality', description: 'Quality control and lab work', icon: 'mdi:shield-check-outline', path: '/quality', color: 'bg-lime-50 text-lime-700 border-lime-200' },
+  { id: 'dispatch', label: 'Dispatch', description: 'Dispatch and delivery workflows', icon: 'mdi:truck-delivery-outline', path: '/dispatch', color: 'bg-sky-50 text-sky-700 border-sky-200' },
+  { id: 'finance', label: 'Finance', description: 'Finance, ledger, and payments', icon: 'mdi:finance', path: '/finance', color: 'bg-violet-50 text-violet-700 border-violet-200' },
+  { id: 'reports', label: 'Reports', description: 'Export assigned reports', icon: 'mdi:file-chart-outline', path: '/reports', color: 'bg-slate-50 text-slate-700 border-slate-200' },
 ];
 
 export default function DashboardPanel({ user }) {
@@ -107,6 +124,56 @@ export default function DashboardPanel({ user }) {
   }));
 
   const allZero = kpis && Object.values(kpis).every((v) => !v || v === 0);
+  const isAdmin = isAdminUser(user);
+  const roleTiles = ROLE_DASHBOARD_TILES.filter((tile) => canAccessModule(user, tile.id));
+
+  if (!isAdmin) {
+    return (
+      <div className="space-y-5 font-sans">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="flex flex-col md:flex-row justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-600 text-[11px] font-bold uppercase tracking-wider mb-2">
+                <Icon icon="mdi:shield-account-outline" className="text-sm" />
+                Role Dashboard
+              </div>
+              <h1 className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 leading-tight">
+                {user?.roleName || 'Employee'} Workspace
+              </h1>
+              <p className="text-slate-500 text-[11px] mt-1 max-w-xl leading-relaxed">
+                Only modules assigned to your role are shown here. Attendance is available for every user.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/rfid_attendance')}
+              className="self-start bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition cursor-pointer"
+            >
+              <Icon icon="mdi:card-account-details-outline" className="text-base" />
+              Open Attendance
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {roleTiles.map((tile) => (
+            <button
+              key={tile.id}
+              onClick={() => navigate(tile.path)}
+              className={`text-left border rounded-2xl p-4 hover:shadow-md transition cursor-pointer ${tile.color}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-extrabold">{tile.label}</div>
+                  <div className="text-xs opacity-80 mt-1">{tile.description}</div>
+                </div>
+                <Icon icon={tile.icon} className="text-2xl shrink-0" />
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 font-sans">

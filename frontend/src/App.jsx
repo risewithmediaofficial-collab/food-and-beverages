@@ -44,6 +44,7 @@ import LaboratoryPanel from './modules/quality/LaboratoryPanel';
 import ExpensePanel from './modules/finance/ExpensePanel';
 import CompliancePanel from './modules/compliance/CompliancePanel';
 import { getModuleIdFromPath, MODULE_MAP } from './moduleRoutes';
+import { canAccessModule, firstAccessibleModule } from './accessControl';
 
 function App() {
   const location = useLocation();
@@ -53,6 +54,10 @@ function App() {
   const [notification, setNotification] = useState({ message: '', type: 'error' });
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024);
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const triggerError = useCallback((msg, type = 'error') => {
+    setNotification({ message: msg, type });
+  }, []);
 
   // Sync sidebar default with window width on resize
   useEffect(() => {
@@ -81,6 +86,14 @@ function App() {
     setActiveModule(moduleId);
   }, [location.pathname]);
 
+  useEffect(() => {
+    if (!user || canAccessModule(user, activeModule)) return;
+    const fallbackModule = firstAccessibleModule(user);
+    setActiveModule(fallbackModule);
+    navigate(MODULE_MAP[fallbackModule]?.path || '/dashboard', { replace: true });
+    triggerError('You do not have access to that module.', 'error');
+  }, [activeModule, navigate, triggerError, user]);
+
   const setDefaultModuleForUser = (userData) => {
     const dept = userData?.department || 'Executive';
     let defaultModule = 'dashboard';
@@ -90,8 +103,9 @@ function App() {
     else if (dept === 'Plant Operations') defaultModule = 'production';
     else if (dept === 'Sales & Marketing') defaultModule = 'sales';
     else if (dept === 'Supply Chain') defaultModule = 'inventory';
-    setActiveModule(defaultModule);
-    navigate(MODULE_MAP[defaultModule]?.path || '/dashboard');
+    const allowedDefault = canAccessModule(userData, defaultModule) ? defaultModule : firstAccessibleModule(userData);
+    setActiveModule(allowedDefault);
+    navigate(MODULE_MAP[allowedDefault]?.path || '/dashboard');
   };
 
   const handleLoginSuccess = (userData) => {
@@ -106,15 +120,15 @@ function App() {
     navigate('/login');
   };
 
-  const triggerError = useCallback((msg, type = 'error') => {
-    setNotification({ message: msg, type });
-  }, []);
-
   if (!user) {
     return <LoginPanel onLoginSuccess={handleLoginSuccess} />;
   }
 
   const renderActiveModule = () => {
+    if (!canAccessModule(user, activeModule)) {
+      return null;
+    }
+
     switch (activeModule) {
       case 'crm':         return <CrmPanel user={user} triggerError={triggerError} />;
       case 'leads':       return <LeadManagementPanel user={user} triggerError={triggerError} />;

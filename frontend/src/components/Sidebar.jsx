@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Icon } from '@iconify/react';
 import { useNavigate } from 'react-router-dom';
 import { MODULE_MAP } from '../moduleRoutes';
+import { filterAccessibleGroups } from '../accessControl';
 
 const getItemPath = (id) => MODULE_MAP[id]?.path || '/dashboard';
 
@@ -115,6 +116,7 @@ function loadGroupState() {
 export default function Sidebar({ activeModule, user, onLogout, isOpen, onClose, isCollapsed, onToggleCollapse }) {
   const [groupCollapsed, setGroupCollapsed] = useState(loadGroupState);
   const navigate = useNavigate();
+  const accessibleGroups = filterAccessibleGroups(NAV_GROUPS, user);
 
   const toggleGroup = (groupId) => {
     setGroupCollapsed((prev) => {
@@ -226,7 +228,7 @@ export default function Sidebar({ activeModule, user, onLogout, isOpen, onClose,
 
         {/* Navigation list */}
         <nav className="flex-1 py-3 px-2 overflow-y-auto space-y-1 custom-scrollbar">
-          {NAV_GROUPS.map((group) => {
+          {accessibleGroups.map((group) => {
             const isGroupCollapsed = groupCollapsed[group.id];
             const hasActiveItem = group.items.some((i) => i.id === activeModule);
 
