@@ -13,16 +13,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Upload project files
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          source: "docker-compose.yml,backend,frontend,package.json,package-lock.json"
-          target: /docker/food-and-beverages
-          rm: true
-
       - name: Deploy containers
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -31,5 +21,17 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             set -e
-            cd /docker/food-and-beverages
+            APP_DIR=/docker/food-and-beverages
+            REPO_URL=https://github.com/${{ github.repository }}.git
+
+            if [ ! -d "$APP_DIR/.git" ]; then
+              rm -rf "$APP_DIR"
+              git clone --depth 1 --branch main "$REPO_URL" "$APP_DIR"
+            else
+              cd "$APP_DIR"
+              git fetch origin main
+              git reset --hard origin/main
+            fi
+
+            cd "$APP_DIR"
             docker compose up -d --build
