@@ -47,6 +47,7 @@ export default function HrPanel({ triggerError }) {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [messageModalEmp, setMessageModalEmp] = useState(null);
   const [newEmp, setNewEmp] = useState(emptyEmployee);
 
@@ -181,7 +182,7 @@ export default function HrPanel({ triggerError }) {
           )}
           <ExportDataToolbar data={employees} filename="employees_master" />
           <button
-            onClick={() => { setNewEmp(emptyEmployee); setShowAddModal(true); }}
+            onClick={() => { setNewEmp(emptyEmployee); setShowNewPassword(false); setShowAddModal(true); }}
             className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
           >
             <Icon icon="mdi:plus" className="text-base" /> Add New Employee
@@ -200,7 +201,7 @@ export default function HrPanel({ triggerError }) {
               The employee directory is currently empty. Add employees manually and assign the correct ERP role.
             </p>
             <button
-              onClick={() => { setNewEmp(emptyEmployee); setShowAddModal(true); }}
+              onClick={() => { setNewEmp(emptyEmployee); setShowNewPassword(false); setShowAddModal(true); }}
               className="mt-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition cursor-pointer"
             >
               + Add First Employee
@@ -360,14 +361,25 @@ export default function HrPanel({ triggerError }) {
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Initial Password *</label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="Set initial password"
-                      value={newEmp.password}
-                      onChange={(e) => setNewEmp({ ...newEmp, password: e.target.value })}
-                      className="w-full border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 font-mono"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        required
+                        placeholder="Set initial password"
+                        value={newEmp.password}
+                        onChange={(e) => setNewEmp({ ...newEmp, password: e.target.value })}
+                        className="w-full border border-slate-200 bg-white rounded-xl px-3 py-2 pr-10 text-xs focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword((prev) => !prev)}
+                        className="absolute inset-y-0 right-2 flex items-center px-1.5 text-slate-400 hover:text-slate-700"
+                        title={showNewPassword ? 'Hide password' : 'Show password'}
+                        aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                      >
+                        <Icon icon={showNewPassword ? 'mdi:eye-off-outline' : 'mdi:eye-outline'} className="text-base" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

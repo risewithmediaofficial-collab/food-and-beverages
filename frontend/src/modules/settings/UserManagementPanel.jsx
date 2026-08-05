@@ -9,6 +9,7 @@ export default function UserManagementPanel({ user, triggerError }) {
 
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -144,6 +145,7 @@ export default function UserManagementPanel({ user, triggerError }) {
           <button
             onClick={() => {
               setFormData({ name: '', email: '', role: 'Employee', department: 'Executive', plant: 'Nashik Facility #1', password: '', status: 'Active' });
+              setShowNewPassword(false);
               setShowAddModal(true);
             }}
             className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-orange-500/20 cursor-pointer"
@@ -191,14 +193,25 @@ export default function UserManagementPanel({ user, triggerError }) {
             {!editingUser && (
               <div>
                 <label className="text-xs text-slate-600 font-bold block mb-1">Password *</label>
-                <input
-                  type="password"
-                  required
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Set initial password"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    required
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Set initial password"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 pr-10 text-xs text-slate-800 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-2 flex items-center px-1.5 text-slate-400 hover:text-slate-700"
+                    title={showNewPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                  >
+                    <Icon icon={showNewPassword ? 'mdi:eye-off-outline' : 'mdi:eye-outline'} className="text-base" />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -283,6 +296,7 @@ export default function UserManagementPanel({ user, triggerError }) {
           <button
             onClick={() => {
               setFormData({ name: '', email: '', role: 'Employee', department: 'Executive', plant: 'Nashik Facility #1', password: '', status: 'Active' });
+              setShowNewPassword(false);
               setShowAddModal(true);
             }}
             className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-2 cursor-pointer shadow-sm"
