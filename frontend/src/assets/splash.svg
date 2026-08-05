@@ -1,0 +1,17 @@
+<svg width="600" height="400" viewBox="0 0 600 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g1" x1="0" x2="1">
+      <stop offset="0%" stop-color="#FDE68A" />
+      <stop offset="100%" stop-color="#FB923C" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="400" rx="24" fill="url(#g1)" opacity="0.08" />
+  <circle cx="120" cy="100" r="60" fill="#fff" opacity="0.22" />
+  <circle cx="480" cy="80" r="44" fill="#fff" opacity="0.18" />
+  <circle cx="360" cy="260" r="90" fill="#fff" opacity="0.06" />
+  <g transform="translate(60,120)">
+    <path d="M40 120 C40 80 120 40 200 40" stroke="#f97316" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.9" />
+    <path d="M60 140 C130 90 230 80 300 110" stroke="#ea580c" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.85" />
+  </g>
+  <text x="50%" y="360" text-anchor="middle" font-family="Inter, sans-serif" font-size="20" fill="#0f172a" opacity="0.6">Food & Beverages — Operations</text>
+</svg>

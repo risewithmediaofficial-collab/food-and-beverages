@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { Icon } from '@iconify/react';
+import splash from '../../assets/splash.svg';
 
 const initialSignup = {
   name: '',
@@ -78,8 +79,14 @@ export default function LoginPanel({ onLoginSuccess }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f8fb] flex items-center justify-center px-4 py-8 font-sans text-slate-900">
-      <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-200/60 overflow-hidden auth-card">
+    <div className="auth-outer font-sans text-slate-900">
+      <div className="auth-split">
+        <div className="auth-illustration">
+          <img src={splash} alt="splash" className="splash-img" />
+        </div>
+
+        <div className="auth-card-wrapper">
+          <div className="w-full bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-200/60 overflow-hidden auth-card">
         <div className="auth-header">
           <div className="flex items-center gap-3">
             <div className="brand-badge bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 shrink-0">
@@ -245,6 +252,9 @@ export default function LoginPanel({ onLoginSuccess }) {
           </form>
         </div>
       )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
