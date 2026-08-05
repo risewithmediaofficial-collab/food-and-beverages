@@ -78,35 +78,38 @@ export default function LoginPanel({ onLoginSuccess }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800">
-      <div className="w-full max-w-md bg-white border border-slate-200/80 rounded-3xl shadow-xl shadow-slate-200/40 p-8 space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-5">
+    <div className="min-h-screen bg-[#f4f7fb] flex items-center justify-center px-4 py-8 font-sans text-slate-900">
+      <div
+        className="w-full bg-white border border-slate-200 rounded-2xl shadow-lg shadow-slate-200/70 px-6 py-5 space-y-5"
+        style={{ maxWidth: '380px' }}
+      >
+        <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+          <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 shrink-0">
+            <Icon icon="mdi:fruit-citrus" className="text-2xl" />
+          </div>
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600">
-              <Icon icon="mdi:fruit-citrus" className="text-2xl" />
-            </div>
-            <div>
-              <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Food & Beverages ERP</h1>
-              <span className="text-xs text-slate-400 font-semibold block">Operations Portal</span>
+            <div className="min-w-0">
+              <h1 className="text-lg font-extrabold text-slate-950 leading-tight">Food & Beverages ERP</h1>
+              <span className="text-xs text-slate-500 font-semibold block">Operations Portal</span>
             </div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3.5">
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">Username / Email</label>
+            <label className="text-xs font-bold text-slate-700 block mb-1.5">Username / Email</label>
             <input
               type="text"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="username"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-orange-500 outline-none transition"
+              className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-950 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none transition"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">Password</label>
+            <label className="text-xs font-bold text-slate-700 block mb-1.5">Password</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -114,12 +117,12 @@ export default function LoginPanel({ onLoginSuccess }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
-                className="w-full px-3.5 py-2.5 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:bg-white focus:border-orange-500 outline-none transition"
+                className="w-full h-10 px-3 pr-10 bg-white border border-slate-300 rounded-lg text-sm text-slate-950 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none transition"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute inset-y-0 right-2 flex items-center px-1.5 text-slate-400 hover:text-slate-700"
+                className="absolute inset-y-0 right-2 flex items-center px-1.5 text-slate-500 hover:text-slate-900"
                 title={showPassword ? 'Hide password' : 'Show password'}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
@@ -134,7 +137,8 @@ export default function LoginPanel({ onLoginSuccess }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-orange-600 hover:bg-orange-700 disabled:opacity-70 text-white text-sm font-bold rounded-xl shadow-lg shadow-orange-500/20 transition flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full h-10 disabled:opacity-70 text-white text-sm font-bold rounded-lg shadow-md shadow-orange-500/20 transition flex items-center justify-center gap-2 cursor-pointer"
+            style={{ backgroundColor: '#ea580c', color: '#ffffff' }}
           >
             {loading ? <Icon icon="mdi:loading" className="animate-spin text-base" /> : <><span>Sign In</span><Icon icon="mdi:arrow-right" className="text-base" /></>}
           </button>
@@ -146,7 +150,7 @@ export default function LoginPanel({ onLoginSuccess }) {
               setSignupError('');
               setSignupMessage('');
             }}
-            className="w-full py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-bold rounded-xl transition flex items-center justify-center gap-2"
+            className="w-full h-10 border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-bold rounded-lg transition flex items-center justify-center gap-2"
           >
             <Icon icon="mdi:account-plus-outline" className="text-base" />
             <span>Create New Account</span>
