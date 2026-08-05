@@ -13,7 +13,6 @@
     "@iconify/react": "^6.0.2",
     "axios": "^1.19.0",
     "clsx": "^2.1.0",
-    "juice-erp": "file:..",
     "lucide-react": "^0.368.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
