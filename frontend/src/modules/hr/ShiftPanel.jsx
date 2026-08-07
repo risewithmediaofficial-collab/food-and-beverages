@@ -1,49 +1,81 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import ExportDataToolbar from '../../components/ExportDataToolbar';
+import { api } from '../../lib/api';
+
+const EMPTY_FORM = {
+  shiftCode: '',
+  shiftName: '',
+  startTime: '08:00 AM',
+  endTime: '05:00 PM',
+  graceTimeMin: 15,
+  breakTimeMin: 60,
+  workingHours: 8,
+  assignedWorkers: 0,
+  overtimePolicy: '1.5x Hourly Rate',
+  status: 'Active',
+};
 
 export default function ShiftPanel({ user, triggerError }) {
   const [shifts, setShifts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingShift, setEditingShift] = useState(null);
-  const [formData, setFormData] = useState({
-    shiftCode: '',
-    shiftName: '',
-    startTime: '08:00 AM',
-    endTime: '05:00 PM',
-    graceTimeMin: 15,
-    breakTimeMin: 60,
-    workingHours: 8,
-    assignedWorkers: 0,
-    overtimePolicy: '1.5x Hourly Rate',
-    status: 'Active',
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
-  const handleCreateShift = (e) => {
-    e.preventDefault();
-    const created = {
-      _id: Date.now().toString(),
-      shiftCode: formData.shiftCode || `SFT-0${shifts.length + 1}`,
-      ...formData,
-    };
-    setShifts([...shifts, created]);
-    setShowAddModal(false);
-    setFormData({ shiftCode: '', shiftName: '', startTime: '08:00 AM', endTime: '05:00 PM', graceTimeMin: 15, breakTimeMin: 60, workingHours: 8, assignedWorkers: 0, overtimePolicy: '1.5x Hourly Rate', status: 'Active' });
-    if (triggerError) triggerError('Shift schedule created!', 'success');
+  useEffect(() => { fetchShifts(); }, []);
+
+  const fetchShifts = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/hr/shifts');
+      setShifts(res?.data || []);
+    } catch (err) {
+      console.warn('Shift fetch failed:', err);
+      setShifts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleUpdateShift = (e) => {
+  const handleCreateShift = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api.post('/hr/shifts', {
+        ...formData,
+        shiftCode: formData.shiftCode || `SFT-${String(shifts.length + 1).padStart(2, '0')}`,
+      });
+      setShifts([res.data, ...shifts]);
+      setShowAddModal(false);
+      setFormData(EMPTY_FORM);
+      if (triggerError) triggerError('Shift schedule created!', 'success');
+    } catch (err) {
+      if (triggerError) triggerError(err?.message || 'Failed to create shift', 'error');
+    }
+  };
+
+  const handleUpdateShift = async (e) => {
     e.preventDefault();
     if (!editingShift) return;
-    setShifts(shifts.map(s => (s._id === editingShift._id ? { ...s, ...formData } : s)));
-    setEditingShift(null);
-    if (triggerError) triggerError('Shift details updated!', 'success');
+    try {
+      const res = await api.put(`/hr/shifts/${editingShift._id}`, formData);
+      setShifts(shifts.map(s => s._id === editingShift._id ? res.data : s));
+      setEditingShift(null);
+      if (triggerError) triggerError('Shift details updated!', 'success');
+    } catch (err) {
+      if (triggerError) triggerError(err?.message || 'Failed to update shift', 'error');
+    }
   };
 
-  const handleDeleteShift = (id) => {
+  const handleDeleteShift = async (id) => {
     if (!window.confirm('Delete this shift schedule?')) return;
-    setShifts(shifts.filter(s => s._id !== id));
-    if (triggerError) triggerError('Shift schedule deleted!', 'success');
+    try {
+      await api.delete(`/hr/shifts/${id}`);
+      setShifts(shifts.filter(s => s._id !== id));
+      if (triggerError) triggerError('Shift schedule deleted!', 'success');
+    } catch (err) {
+      if (triggerError) triggerError(err?.message || 'Failed to delete shift', 'error');
+    }
   };
 
   const openEditModal = (s) => {
@@ -76,7 +108,7 @@ export default function ShiftPanel({ user, triggerError }) {
           <ExportDataToolbar data={shifts} filename="plant_shifts_roster" title="Shift Roster Management" />
           <button
             onClick={() => {
-              setFormData({ shiftCode: `SFT-0${shifts.length + 1}`, shiftName: '', startTime: '08:00 AM', endTime: '05:00 PM', graceTimeMin: 15, breakTimeMin: 60, workingHours: 8, assignedWorkers: 0, overtimePolicy: '1.5x Hourly Rate', status: 'Active' });
+              setFormData({ ...EMPTY_FORM, shiftCode: `SFT-${String(shifts.length + 1).padStart(2, '0')}` });
               setShowAddModal(true);
             }}
             className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-orange-500/20 cursor-pointer"
@@ -99,81 +131,37 @@ export default function ShiftPanel({ user, triggerError }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="text-xs text-slate-600 font-bold block mb-1">Shift Code *</label>
-              <input
-                type="text"
-                required
-                value={formData.shiftCode}
-                onChange={(e) => setFormData({ ...formData, shiftCode: e.target.value })}
-                placeholder="e.g. SFT-01"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-mono outline-none uppercase"
-              />
+              <input type="text" required value={formData.shiftCode} onChange={(e) => setFormData({ ...formData, shiftCode: e.target.value })} placeholder="e.g. SFT-01" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-mono outline-none uppercase" />
             </div>
 
             <div className="sm:col-span-2">
               <label className="text-xs text-slate-600 font-bold block mb-1">Shift Name *</label>
-              <input
-                type="text"
-                required
-                value={formData.shiftName}
-                onChange={(e) => setFormData({ ...formData, shiftName: e.target.value })}
-                placeholder="e.g. Morning Production Shift"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
-              />
+              <input type="text" required value={formData.shiftName} onChange={(e) => setFormData({ ...formData, shiftName: e.target.value })} placeholder="e.g. Morning Production Shift" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none" />
             </div>
 
             <div>
               <label className="text-xs text-slate-600 font-bold block mb-1">Start Time *</label>
-              <input
-                type="text"
-                required
-                value={formData.startTime}
-                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                placeholder="06:00 AM"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-mono outline-none"
-              />
+              <input type="text" required value={formData.startTime} onChange={(e) => setFormData({ ...formData, startTime: e.target.value })} placeholder="06:00 AM" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-mono outline-none" />
             </div>
 
             <div>
               <label className="text-xs text-slate-600 font-bold block mb-1">End Time *</label>
-              <input
-                type="text"
-                required
-                value={formData.endTime}
-                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                placeholder="02:30 PM"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-mono outline-none"
-              />
+              <input type="text" required value={formData.endTime} onChange={(e) => setFormData({ ...formData, endTime: e.target.value })} placeholder="02:30 PM" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-mono outline-none" />
             </div>
 
             <div>
               <label className="text-xs text-slate-600 font-bold block mb-1">Grace Period (Minutes)</label>
-              <input
-                type="number"
-                value={formData.graceTimeMin}
-                onChange={(e) => setFormData({ ...formData, graceTimeMin: Number(e.target.value) })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none font-mono"
-              />
+              <input type="number" value={formData.graceTimeMin} onChange={(e) => setFormData({ ...formData, graceTimeMin: Number(e.target.value) })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none font-mono" />
             </div>
 
             <div>
               <label className="text-xs text-slate-600 font-bold block mb-1">Break Duration (Minutes)</label>
-              <input
-                type="number"
-                value={formData.breakTimeMin}
-                onChange={(e) => setFormData({ ...formData, breakTimeMin: Number(e.target.value) })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none font-mono"
-              />
+              <input type="number" value={formData.breakTimeMin} onChange={(e) => setFormData({ ...formData, breakTimeMin: Number(e.target.value) })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none font-mono" />
             </div>
 
             <div>
               <label className="text-xs text-slate-600 font-bold block mb-1">Overtime Policy</label>
-              <input
-                type="text"
-                value={formData.overtimePolicy}
-                onChange={(e) => setFormData({ ...formData, overtimePolicy: e.target.value })}
-                placeholder="1.5x Hourly Rate"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
-              />
+              <input type="text" value={formData.overtimePolicy} onChange={(e) => setFormData({ ...formData, overtimePolicy: e.target.value })} placeholder="1.5x Hourly Rate" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none" />
             </div>
           </div>
 
@@ -186,7 +174,9 @@ export default function ShiftPanel({ user, triggerError }) {
         </form>
       )}
 
-      {shifts.length === 0 ? (
+      {loading ? (
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center text-xs text-slate-400">Loading shifts...</div>
+      ) : shifts.length === 0 ? (
         <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center space-y-3">
           <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center mx-auto text-2xl">
             <Icon icon="mdi:clock-outline" />
@@ -194,10 +184,7 @@ export default function ShiftPanel({ user, triggerError }) {
           <h3 className="text-sm font-bold text-slate-800">No Shift Schedules Configured</h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">There are no plant shift schedules configured. Click below to add your first shift roster.</p>
           <button
-            onClick={() => {
-              setFormData({ shiftCode: 'SFT-01', shiftName: '', startTime: '08:00 AM', endTime: '05:00 PM', graceTimeMin: 15, breakTimeMin: 60, workingHours: 8, assignedWorkers: 0, overtimePolicy: '1.5x Hourly Rate', status: 'Active' });
-              setShowAddModal(true);
-            }}
+            onClick={() => { setFormData({ ...EMPTY_FORM, shiftCode: 'SFT-01' }); setShowAddModal(true); }}
             className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-2 cursor-pointer shadow-sm"
           >
             <Icon icon="mdi:plus" className="text-base" /> Configure First Shift

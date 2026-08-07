@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '@iconify/react';
 import ExportDataToolbar from '../../components/ExportDataToolbar';
+import logo from '../../assets/hero.png';
 import { api } from '../../lib/api';
+import { useNavigate } from 'react-router-dom';
+import BackButton from '../../components/BackButton';
+import useMountAnimation from '../../lib/useMountAnimation';
 
 const LOCKED_PERMISSIONS = ['DASHBOARD', 'ATTENDANCE'];
 
@@ -117,8 +121,10 @@ const formatPermissions = (permissions) => (
 );
 
 export default function RolesPanel({ triggerError }) {
+  const mountCls = useMountAnimation();
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPermissionPicker, setShowPermissionPicker] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
@@ -240,7 +246,7 @@ export default function RolesPanel({ triggerError }) {
   };
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className={`space-y-6 font-sans transition duration-300 ease-out ${mountCls}`}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -250,13 +256,58 @@ export default function RolesPanel({ triggerError }) {
           <p className="text-xs text-slate-400">Choose module permissions with checkboxes instead of typing comma-separated codes.</p>
         </div>
 
+        <div className="w-full sm:w-auto mt-3 sm:mt-0 flex items-center gap-3">
+          <BackButton to="/settings" label="Back" />
+          <span className="text-xs text-slate-400">Settings / Roles & Permissions</span>
+        </div>
+
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          <ExportDataToolbar data={roles} filename="rbac_roles_permissions_matrix" title="Role Access Control Matrix" />
+          <ExportDataToolbar
+            data={roles.map(r => ({
+              roleName: r.roleName || r.name || '',
+              accessLevel: r.accessLevel || '',
+              permissions: Array.isArray(r.permissions) ? r.permissions.join(', ') : (r.permissions || ''),
+              activeUsers: r.activeUsers || 0,
+              status: r.status || 'Active',
+            }))}
+            filename="rbac_roles_permissions_matrix"
+            title="Role Access Control Matrix"
+          />
+          <button
+            onClick={() => {
+              const printWindow = window.open('', '_blank');
+              if (!printWindow) { alert('Please allow popups to enable printing.'); return; }
+              const styles = `@page { size: A4 landscape; margin: 10mm; } body{font-family:Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;color:#0f172a;margin:15px;font-size:11px} .logo{height:40px;margin-bottom:8px} table{width:100%;border-collapse:collapse;margin-top:10px} th,td{border:1px solid #cbd5e1;padding:8px 10px;text-align:left;word-break:break-word} th{background:#ea580c;color:#fff;font-weight:bold} tr:nth-child(even) td { background:#f8fafc; }`;
+              const rows = roles.map(r => `
+                <tr>
+                  <td>${(r.roleName||r.name||'').replace(/</g,'&lt;')}</td>
+                  <td>${(r.accessLevel||'').replace(/</g,'&lt;')}</td>
+                  <td>${(Array.isArray(r.permissions)?r.permissions.join(', '): (r.permissions||'')).replace(/</g,'&lt;')}</td>
+                  <td>${r.activeUsers||0}</td>
+                  <td>${(r.status||'Active').replace(/</g,'&lt;')}</td>
+                </tr>`).join('');
+              const html = `
+                <html><head><title>Roles</title><style>${styles}</style></head>
+                <body>
+                  <img src="${logo}" class="logo" />
+                  <h1>Role Access Control Matrix</h1>
+                  <table>
+                    <thead><tr><th>Role Title</th><th>Access Level</th><th>Permissions</th><th>Active Users</th><th>Status</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                  </table>
+                  <script>window.onload=function(){window.print();setTimeout(()=>window.close(),250)}</script>
+                </body></html>`;
+              printWindow.document.write(html); printWindow.document.close(); printWindow.focus();
+            }}
+            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap shrink-0 cursor-pointer h-9 shadow-xs"
+          >
+            <Icon icon="mdi:printer" className="text-sm text-slate-600" /> Print
+          </button>
           <button
             onClick={openCreateModal}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-orange-500/20 cursor-pointer"
+            className="bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white rounded-xl px-3.5 py-1.5 text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer whitespace-nowrap shrink-0 h-9"
           >
-            <Icon icon="mdi:plus" className="text-base" /> Add New Role
+            <Icon icon="mdi:plus" className="text-sm" /> Add New Role
           </button>
         </div>
       </div>

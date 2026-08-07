@@ -61,12 +61,12 @@ export default function MaintenancePanel({ user, triggerError }) {
       const res = await api.post('/machines/maintenance', payload);
       if (res.success && res.data) {
         setTickets([res.data, ...tickets]);
+        setShowAddModal(false);
+        setFormData({ ticketNo: '', machineName: '', machineCode: 'MAC-FIL-01', type: 'Preventive Maintenance', description: '', technician: 'Sunil Rao', cost: 4500, status: 'In Progress' });
+        if (triggerError) triggerError('Maintenance work order created!', 'success');
       } else {
-        setTickets([{ _id: Date.now().toString(), ...payload }, ...tickets]);
+        throw new Error(res.message || 'Failed to create maintenance order');
       }
-      setShowAddModal(false);
-      setFormData({ ticketNo: '', machineName: '', machineCode: 'MAC-FIL-01', type: 'Preventive Maintenance', description: '', technician: 'Sunil Rao', cost: 4500, status: 'In Progress' });
-      if (triggerError) triggerError('Maintenance work order created!', 'success');
     } catch (err) {
       if (triggerError) triggerError(err.message || 'Failed to create maintenance order');
     } finally {

@@ -4,13 +4,17 @@ import { socket } from '../../lib/socket';
 import { Icon } from '@iconify/react';
 import UnitSelector from '../../components/UnitSelector';
 
+import ExportDataToolbar from '../../components/ExportDataToolbar';
+
 export default function ProductionPanel({ user, triggerError }) {
   const [orders, setOrders] = useState([]);
+  const [plans, setPlans] = useState([]);
+  const [selectedPlanId, setSelectedPlanId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
   const [showNewModal, setShowNewModal] = useState(false);
-  const [newOrder, setNewOrder] = useState({ productName: '', qtyPlanned: 5000, shiftId: 'Morning' });
+  const [newOrder, setNewOrder] = useState({ productName: '', qtyPlanned: 5000, shiftId: 'Morning', unit: 'Bottles' });
   const [editingOrder, setEditingOrder] = useState(null);
   const [actionError, setActionError] = useState('');
 
@@ -40,11 +44,17 @@ export default function ProductionPanel({ user, triggerError }) {
     setIsLoading(true);
     setLoadError('');
     try {
-      const res = await api.get('/production/orders');
-      if (res.success) {
-        setOrders(res.data.map(o => ({ ...o, productName: o.productId?.name || o.productName || 'Juice Product' })));
+      const [orderRes, planRes] = await Promise.all([
+        api.get('/production/orders'),
+        api.get('/production/plans'),
+      ]);
+      if (orderRes.success) {
+        setOrders(orderRes.data.map(o => ({ ...o, productName: o.productId?.name || o.productName || 'Juice Product' })));
       } else {
         setOrders([]);
+      }
+      if (planRes.success && Array.isArray(planRes.data)) {
+        setPlans(planRes.data);
       }
     } catch (err) {
       console.warn('Unable to load production orders from backend.', err);
@@ -52,6 +62,21 @@ export default function ProductionPanel({ user, triggerError }) {
       setLoadError('Unable to load production orders. Please verify backend connectivity.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSelectPlan = (planId) => {
+    setSelectedPlanId(planId);
+    if (!planId) return;
+    const p = plans.find((pl) => pl._id === planId || pl.planCode === planId);
+    if (p) {
+      setNewOrder({
+        ...newOrder,
+        productName: p.productName || '',
+        qtyPlanned: p.targetQty || Number(p.plannedQty?.replace(/[^0-9]/g, '')) || 5000,
+        unit: p.unit || 'Bottles',
+        shiftId: p.shift?.includes('Evening') ? 'Evening' : p.shift?.includes('Night') ? 'Night' : 'Morning',
+      });
     }
   };
 
@@ -80,6 +105,7 @@ export default function ProductionPanel({ user, triggerError }) {
     const payload = {
       productName: newOrder.productName,
       qtyPlanned: Number(newOrder.qtyPlanned),
+      unit: newOrder.unit || 'Bottles',
       shiftId: newOrder.shiftId,
       batchId: `F1-ORG500-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(100 + Math.random()*900)}`,
     };
@@ -89,26 +115,14 @@ export default function ProductionPanel({ user, triggerError }) {
       if (res.success && res.data) {
         setOrders([{ ...res.data, productName: newOrder.productName }, ...orders]);
         setShowNewModal(false);
-        setNewOrder({ productName: '', qtyPlanned: 5000, shiftId: 'Morning' });
+        setNewOrder({ productName: '', qtyPlanned: 5000, shiftId: 'Morning', unit: 'Bottles' });
+        if (triggerError) triggerError('Production order created successfully!', 'success');
         return;
       }
       throw new Error(res.message || 'Order creation failed');
     } catch (err) {
-      // Local preview entry fallback
-      const orderObj = {
-        _id: Date.now().toString(),
-        orderNo: `PO-${Math.floor(10000 + Math.random() * 90000)}`,
-        batchId: payload.batchId,
-        productName: newOrder.productName,
-        qtyPlanned: Number(newOrder.qtyPlanned),
-        qtyProduced: 0,
-        status: 'planning',
-        shiftId: newOrder.shiftId,
-        isBackendOrder: false,
-      };
-      setOrders([orderObj, ...orders]);
-      setShowNewModal(false);
-      setNewOrder({ productName: '', qtyPlanned: 5000, shiftId: 'Morning' });
+      if (triggerError) triggerError(err.message || 'Failed to create production order');
+      setActionError(err.message || 'Unable to create production order.');
     }
   };
 
@@ -185,16 +199,19 @@ export default function ProductionPanel({ user, triggerError }) {
           <p className="text-xs text-slate-400">Automated batch ID generation, BOM inventory deduction, and shift management</p>
         </div>
 
-        <button
-          onClick={handleOpenCreateModal}
-          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md transition cursor-pointer w-full sm:w-auto ${
-            canManageProduction
-              ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20'
-              : 'bg-slate-100 text-slate-400 border border-slate-200'
-          }`}
-        >
-          <Icon icon="mdi:plus" className="text-base" /> Create Production Order
-        </button>
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <ExportDataToolbar data={orders} filename="production_orders_master" title="Production Orders & Batch Control" />
+          <button
+            onClick={handleOpenCreateModal}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md transition cursor-pointer w-full sm:w-auto ${
+              canManageProduction
+                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20'
+                : 'bg-slate-100 text-slate-400 border border-slate-200'
+            }`}
+          >
+            <Icon icon="mdi:plus" className="text-base" /> Create Production Order
+          </button>
+        </div>
       </div>
 
       {!canManageProduction && (
@@ -214,10 +231,36 @@ export default function ProductionPanel({ user, triggerError }) {
       {/* Create Order Modal */}
       {showNewModal && (
         <form onSubmit={handleCreateOrder} className="bg-white border border-blue-200 p-5 rounded-2xl space-y-4 shadow-sm">
-          <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wider">New Production Order Entry</h3>
+          <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-2">
+            <Icon icon="mdi:calendar-check-outline" className="text-blue-600 text-base" /> New Production Order Entry
+          </h3>
+
+          <div className="bg-blue-50/60 border border-blue-100 p-3 rounded-xl">
+            <label className="text-xs font-bold text-blue-900 block mb-1">
+              Select Approved Production Plan (Auto-fill)
+            </label>
+            <select
+              value={selectedPlanId}
+              onChange={(e) => handleSelectPlan(e.target.value)}
+              className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              <option value="">-- Custom Manual Entry (Or select a Production Plan below) --</option>
+              {plans.map((p) => (
+                <option key={p._id} value={p._id}>
+                  [{p.planCode || 'PLAN'}] {p.productName} ({p.plannedQty || `${p.targetQty || 5000} ${p.unit || 'Bottles'}`} - {p.shift || 'Morning'})
+                </option>
+              ))}
+            </select>
+            {selectedPlanId && (
+              <span className="text-[10px] text-blue-700 block mt-1 font-semibold">
+                ✓ Auto-filled details from Production Plan
+              </span>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs text-slate-600 block mb-1">Product / Item Name</label>
+              <label className="text-xs text-slate-600 block mb-1">Product / Item Name *</label>
               <input
                 type="text"
                 required
@@ -227,7 +270,7 @@ export default function ProductionPanel({ user, triggerError }) {
               />
             </div>
             <div>
-              <label className="text-xs text-slate-600 block mb-1">Target Planned Quantity</label>
+              <label className="text-xs text-slate-600 block mb-1">Target Planned Quantity *</label>
               <input
                 type="number"
                 min="1"

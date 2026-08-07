@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import ExportDataToolbar from '../../components/ExportDataToolbar';
 import { api } from '../../lib/api';
+import { useNavigate } from 'react-router-dom';
+import BackButton from '../../components/BackButton';
+import useMountAnimation from '../../lib/useMountAnimation';
 
 export default function UserManagementPanel({ user, triggerError }) {
+  const mountCls = useMountAnimation();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
 
@@ -21,24 +25,44 @@ export default function UserManagementPanel({ user, triggerError }) {
     status: 'Active',
   });
 
+  const [factories, setFactories] = useState([]);
+
   useEffect(() => {
     fetchUsers();
     fetchRoles();
+    fetchFactories();
   }, []);
 
-  const roleOptions = roles.length
-    ? roles
-    : [
-      { roleName: 'Employee', accessLevel: 'Employee Self Service Portal' },
-      { roleName: 'Line Operator', accessLevel: 'Machine Operations Portal' },
-      { roleName: 'Plant Supervisor', accessLevel: 'Production & Planning Portal' },
-      { roleName: 'Quality Inspector', accessLevel: 'QA Lab & Testing Portal' },
-      { roleName: 'Sales Lead', accessLevel: 'Sales & CRM Portal' },
-      { roleName: 'Inventory Manager', accessLevel: 'Inventory & Warehouse Portal' },
-      { roleName: 'Accounts Specialist', accessLevel: 'Finance & Billing Portal' },
-      { roleName: 'HR Manager', accessLevel: 'HR & Employee Portal' },
-      { roleName: 'General Manager', accessLevel: 'Full System Superadmin' },
-    ];
+  const fetchFactories = async () => {
+    try {
+      const res = await api.get('/org/factories');
+      if (res.success && Array.isArray(res.data)) {
+        setFactories(res.data);
+      }
+    } catch (e) {
+      console.warn('Failed to load factories for user panel:', e);
+    }
+  };
+
+  const defaultRolesList = [
+    { roleName: 'Employee', accessLevel: 'Employee Self Service Portal' },
+    { roleName: 'Line Operator', accessLevel: 'Machine Operations Portal' },
+    { roleName: 'Plant Supervisor', accessLevel: 'Production & Planning Portal' },
+    { roleName: 'Quality Inspector', accessLevel: 'QA Lab & Testing Portal' },
+    { roleName: 'Sales Lead', accessLevel: 'Sales & CRM Portal' },
+    { roleName: 'Inventory Manager', accessLevel: 'Inventory & Warehouse Portal' },
+    { roleName: 'Accounts Specialist', accessLevel: 'Finance & Billing Portal' },
+    { roleName: 'HR Manager', accessLevel: 'HR & Employee Portal' },
+    { roleName: 'General Manager', accessLevel: 'Full System Superadmin' },
+  ];
+
+  const combinedRolesMap = new Map();
+  defaultRolesList.forEach((r) => combinedRolesMap.set(r.roleName, r));
+  roles.forEach((r) => {
+    const name = r.roleName || r.name;
+    if (name) combinedRolesMap.set(name, { ...r, roleName: name });
+  });
+  const roleOptions = Array.from(combinedRolesMap.values());
 
   const fetchUsers = async () => {
     try {
@@ -68,6 +92,7 @@ export default function UserManagementPanel({ user, triggerError }) {
     }
   };
 
+  const navigate = useNavigate();
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
@@ -131,26 +156,105 @@ export default function UserManagementPanel({ user, triggerError }) {
   };
 
   return (
-    <div className="space-y-6 font-sans">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
-        <div>
-          <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Icon icon="mdi:account-group" className="text-orange-500 text-lg" /> System User Accounts & Access Directory
-          </h2>
-          <p className="text-xs text-slate-400">Manage user login accounts, department assignments, role permissions, and active sessions</p>
+    <div className={`space-y-6 font-sans transition duration-300 ease-out ${mountCls}`}>
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full xl:w-auto">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Icon icon="mdi:account-group" className="text-orange-500 text-lg" /> System User Accounts & Access Directory
+            </h2>
+            <p className="text-xs text-slate-400">Manage user login accounts, department assignments, role permissions, and active sessions</p>
+          </div>
+          <div className="w-full sm:w-auto mt-1 sm:mt-0 flex items-center gap-3 shrink-0">
+            <BackButton to="/settings" label="Back" />
+            <span className="text-xs text-slate-400 whitespace-nowrap">Settings / User Management</span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          <ExportDataToolbar data={users} filename="user_accounts_directory" title="System User Accounts" />
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full xl:w-auto justify-start sm:justify-end">
+          {/* Export only selected fields to avoid leaking internal fields like passwordHash */}
+          <ExportDataToolbar
+            data={users.map(u => ({
+              empId: u.empId || (u._id ? u._id.substring(0, 8) : ''),
+              name: u.name || '',
+              email: u.email || '',
+              role: u.role || u.roleName || '',
+              department: u.department || '',
+              facility: u.plant || 'Nashik Facility #1',
+              status: u.status || 'Active',
+            }))}
+            filename="user_accounts_directory"
+            title="System User Accounts"
+          />
+          <button
+            onClick={() => {
+              // Print the visible users table
+              const printWindow = window.open('', '_blank');
+              if (!printWindow) {
+                alert('Please allow popups to enable printing.');
+                return;
+              }
+              const styles = `
+                @page { size: A4 landscape; margin: 10mm; }
+                body{font-family:Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;color:#0f172a;margin:15px;font-size:11px}
+                table{width:100%;border-collapse:collapse;margin-top:10px}
+                th,td{border:1px solid #cbd5e1;padding:8px 10px;text-align:left;word-break:break-word}
+                th{background:#ea580c;color:#fff;font-weight:bold}
+                tr:nth-child(even) td { background:#f8fafc; }
+              `;
+              const rows = users.map(u => `
+                <tr>
+                  <td>${u.empId || (u._id ? u._id.substring(0,8) : '')}</td>
+                  <td>${(u.name||'').replace(/</g,'&lt;')}</td>
+                  <td>${(u.email||'').replace(/</g,'&lt;')}</td>
+                  <td>${(u.role||u.roleName||'').replace(/</g,'&lt;')}</td>
+                  <td>${(u.department||'').replace(/</g,'&lt;')}</td>
+                  <td>${(u.plant||'Nashik Facility #1').replace(/</g,'&lt;')}</td>
+                  <td>${(u.status||'Active').replace(/</g,'&lt;')}</td>
+                </tr>`).join('');
+
+              const html = `
+                <html>
+                  <head><title>System User Accounts</title><style>${styles}</style></head>
+                  <body>
+                    <h1>System User Accounts</h1>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Employee ID</th>
+                          <th>User Name</th>
+                          <th>Email Address</th>
+                          <th>Assigned Role</th>
+                          <th>Department</th>
+                          <th>Facility</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${rows}
+                      </tbody>
+                    </table>
+                    <script>window.onload=function(){window.print();setTimeout(()=>window.close(),250)}</script>
+                  </body>
+                </html>`;
+
+              printWindow.document.write(html);
+              printWindow.document.close();
+              printWindow.focus();
+            }}
+            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 transition whitespace-nowrap shrink-0 cursor-pointer h-9 shadow-xs"
+          >
+            <Icon icon="mdi:printer" className="text-sm text-slate-600" /> Print
+          </button>
           <button
             onClick={() => {
               setFormData({ name: '', email: '', role: 'Employee', department: 'Executive', plant: 'Nashik Facility #1', password: '', status: 'Active' });
               setShowNewPassword(false);
               setShowAddModal(true);
             }}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-orange-500/20 cursor-pointer"
+            className="bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white rounded-xl px-3.5 py-1.5 text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer whitespace-nowrap shrink-0 h-9"
           >
-            <Icon icon="mdi:plus" className="text-base" /> Add New User
+            <Icon icon="mdi:plus" className="text-sm" /> Add New User
           </button>
         </div>
       </div>
@@ -257,8 +361,18 @@ export default function UserManagementPanel({ user, triggerError }) {
                 onChange={(e) => setFormData({ ...formData, plant: e.target.value })}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
               >
-                <option value="Nashik Facility #1">Nashik Facility #1</option>
-                <option value="Pune Bottling Plant #2">Pune Bottling Plant #2</option>
+                {factories.length > 0 ? (
+                  factories.map((f) => (
+                    <option key={f._id} value={f.name || f.plantCode}>
+                      {f.name} ({f.location || 'Processing Plant'})
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Nashik Facility #1">Nashik Facility #1</option>
+                    <option value="Pune Bottling Plant #2">Pune Bottling Plant #2</option>
+                  </>
+                )}
                 <option value="All Plants (Corporate HQ)">All Plants (Corporate HQ)</option>
               </select>
             </div>
@@ -291,8 +405,8 @@ export default function UserManagementPanel({ user, triggerError }) {
           <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center mx-auto text-2xl">
             <Icon icon="mdi:account-group" />
           </div>
-          <h3 className="text-sm font-bold text-slate-800">No User Accounts Found</h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">There are no user accounts created in the system directory. Click below to add a new user.</p>
+          <h3 className="text-sm font-bold text-slate-800">No User Accounts Configured</h3>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">Create user accounts using the <span className="font-semibold">Add New User</span> button.</p>
           <button
             onClick={() => {
               setFormData({ name: '', email: '', role: 'Employee', department: 'Executive', plant: 'Nashik Facility #1', password: '', status: 'Active' });

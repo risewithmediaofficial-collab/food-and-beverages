@@ -13,7 +13,7 @@ const NAV_GROUPS = [
     icon: 'mdi:view-dashboard-outline',
     items: [
       { id: 'dashboard', label: 'Executive Dashboard', icon: 'mdi:view-dashboard-outline' },
-      { id: 'org', label: 'Organization', icon: 'mdi:domain' },
+      { id: 'org', label: 'Organization & GST Setup', icon: 'mdi:domain' },
       { id: 'settings', label: 'Settings', icon: 'mdi:cog-outline' },
       { id: 'audit', label: 'Audit Logs', icon: 'mdi:clipboard-text-clock-outline' },
     ],

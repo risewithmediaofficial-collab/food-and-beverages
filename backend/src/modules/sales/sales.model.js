@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const salesItemSchema = new mongoose.Schema({
-  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
   productName: String,
   qty: { type: Number, required: true },
   rate: { type: Number, required: true },
@@ -11,7 +11,8 @@ const salesItemSchema = new mongoose.Schema({
 const quotationSchema = new mongoose.Schema({
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   quotationNo: { type: String, required: true, unique: true },
-  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
+  customerName: String,
   items: [salesItemSchema],
   totalAmount: { type: Number, required: true },
   validTill: Date,
@@ -24,7 +25,8 @@ const salesOrderSchema = new mongoose.Schema({
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   orderNo: { type: String, required: true, unique: true },
   quotationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Quotation' },
-  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
+  customerName: String,
   items: [salesItemSchema],
   totalAmount: { type: Number, required: true },
   requiredDate: Date,
@@ -41,7 +43,8 @@ const salesInvoiceSchema = new mongoose.Schema({
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   invoiceNo: { type: String, required: true, unique: true },
   salesOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'SalesOrder', required: true },
-  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
+  customerName: String,
   items: [salesItemSchema],
   subtotal: Number,
   gstRatePct: { type: Number, default: 18 },

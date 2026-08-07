@@ -4,7 +4,7 @@ import { Icon } from '@iconify/react';
 import { MODULE_MAP } from '../moduleRoutes';
 
 export default function Header({ activeModule, user, onMenuToggle, isCollapsed }) {
-  const [isLive, setIsLive] = useState(socket.connected);
+  const [isLive, setIsLive] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [notifications, setNotifications] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [nowStr, setNowStr] = useState('');
@@ -26,12 +26,20 @@ export default function Header({ activeModule, user, onMenuToggle, isCollapsed }
   useEffect(() => {
     const onConnect = () => setIsLive(true);
     const onDisconnect = () => setIsLive(false);
+    const onOnline = () => setIsLive(true);
+    const onOffline = () => setIsLive(false);
+
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('notification:new', (notif) => {
       setNotifications((prev) => [notif, ...prev].slice(0, 20));
     });
+
     return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
     };
@@ -63,7 +71,7 @@ export default function Header({ activeModule, user, onMenuToggle, isCollapsed }
               {moduleLabel}
             </h2>
           </div>
-          <span className="text-[11px] text-slate-400 font-medium block mt-0.5 truncate hidden sm:block">
+          <span className="text-[11px] text-slate-400 font-medium mt-0.5 truncate hidden sm:block">
             {plantName} · {user?.department || 'Executive'}
           </span>
         </div>
@@ -87,10 +95,12 @@ export default function Header({ activeModule, user, onMenuToggle, isCollapsed }
           <span>{isLive ? 'Live' : 'Offline'}</span>
         </div>
 
-        {/* Plant Badge */}
-        <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-xl text-[11px] font-semibold text-orange-700">
-          <Icon icon="mdi:factory" className="text-orange-500 text-sm" />
-          <span className="truncate max-w-[120px]">{plantName}</span>
+        {/* SaaS Organization Badge / Super Admin Notice */}
+        <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] font-semibold text-amber-800">
+          <Icon icon={user?.isSuperAdmin ? "mdi:shield-crown" : "mdi:domain"} className="text-amber-600 text-sm" />
+          <span className="truncate max-w-[140px] font-bold">
+            {user?.isSuperAdmin ? 'Super Admin Mode' : (user?.orgName || 'Juice ERP Multi-Tenant')}
+          </span>
         </div>
 
         {/* Notifications Bell */}

@@ -2,9 +2,26 @@ import { Recipe } from './recipe.model.js';
 
 export const recipeService = {
   async calculateRequirement(recipeId, targetQty) {
+    if (!recipeId) {
+      return {
+        recipeId: null,
+        recipeName: 'Standard Process Recipe',
+        targetQty: targetQty || 1000,
+        outputUnit: 'Bottles',
+        scaleFactor: 1,
+        requirements: [],
+      };
+    }
     const recipe = await Recipe.findById(recipeId).populate('ingredients.itemId');
     if (!recipe) {
-      throw new Error(`Recipe with ID ${recipeId} not found`);
+      return {
+        recipeId: null,
+        recipeName: 'Standard Process Recipe',
+        targetQty: targetQty || 1000,
+        outputUnit: 'Bottles',
+        scaleFactor: 1,
+        requirements: [],
+      };
     }
 
     const scaleFactor = targetQty / recipe.outputQty;

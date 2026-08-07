@@ -16,10 +16,13 @@ import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
 import financeRoutes from './modules/finance/finance.routes.js';
 import dispatchRoutes from './modules/dispatch/dispatch.routes.js';
 import hrRoutes from './modules/hr/hr.routes.js';
-
+import complianceRoutes from './modules/compliance/compliance.routes.js';
 import orgRoutes from './modules/org/org.routes.js';
+import superadminRoutes, { ensureSuperAdmin } from './modules/superadmin/superadmin.routes.js';
 
 const app = express();
+
+ensureSuperAdmin();
 
 app.use(cors({
   origin: true,
@@ -42,6 +45,9 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'Juice ERP Enterprise API', timestamp: new Date() });
 });
 
+app.use('/api/v1/public', superadminRoutes);
+app.use('/api/v1/superadmin', superadminRoutes);
+
 app.use(authenticate);
 
 app.use('/api/v1/auth', authRoutes);
@@ -58,6 +64,7 @@ app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/finance', financeRoutes);
 app.use('/api/v1/dispatch', dispatchRoutes);
 app.use('/api/v1/hr', hrRoutes);
+app.use('/api/v1/compliance', complianceRoutes);
 
 app.use(errorHandler);
 

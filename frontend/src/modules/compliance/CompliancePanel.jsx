@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
+import { api } from '../../lib/api';
+import ExportDataToolbar from '../../components/ExportDataToolbar';
 
 const COMPLIANCE_TYPES = [
   'FSSAI License',
@@ -43,32 +45,90 @@ function daysUntilExpiry(dateStr) {
 
 export default function CompliancePanel({ user, triggerError }) {
   const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [filterStatus, setFilterStatus] = useState('All');
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    loadRecords();
+  }, []);
+
+  const loadRecords = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/compliance/records');
+      if (res.success && Array.isArray(res.data)) {
+        setRecords(res.data.map(r => ({
+          ...r,
+          licenseName: r.licenseName || r.complianceType,
+          authority: r.authority || r.issuedBy,
+        })));
+      } else {
+        setRecords([]);
+      }
+    } catch (err) {
+      console.warn('Failed to load compliance records:', err);
+      setRecords([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Auto-compute status from expiry date
     let computedStatus = form.status;
     const days = daysUntilExpiry(form.expiryDate);
     if (days !== null) {
       if (days < 0) computedStatus = 'Expired';
       else if (days <= 30) computedStatus = 'Expiring Soon';
     }
-    const payload = { ...form, status: computedStatus };
+    const payload = {
+      ...form,
+      licenseName: form.complianceType,
+      authority: form.issuedBy || 'Food Safety Authority',
+      status: computedStatus,
+    };
 
-    if (editing) {
-      setRecords(records.map((r) => (r._id === editing._id ? { ...r, ...payload } : r)));
-      if (triggerError) triggerError('Compliance record updated!', 'success');
-    } else {
-      setRecords([{ _id: Date.now().toString(), ...payload }, ...records]);
-      if (triggerError) triggerError('Compliance record added!', 'success');
+    try {
+      setLoading(true);
+      if (editing) {
+        const res = await api.put(`/compliance/records/${editing._id}`, payload);
+        if (res.success && res.data) {
+          setRecords(records.map((r) => (r._id === editing._id ? res.data : r)));
+          if (triggerError) triggerError('Compliance record updated!', 'success');
+        } else {
+          throw new Error(res.message || 'Failed to update record');
+        }
+      } else {
+        const res = await api.post('/compliance/records', payload);
+        if (res.success && res.data) {
+          setRecords([res.data, ...records]);
+          if (triggerError) triggerError('Compliance record added!', 'success');
+        } else {
+          throw new Error(res.message || 'Failed to add record');
+        }
+      }
+      setShowModal(false);
+      setEditing(null);
+      setForm(emptyForm);
+    } catch (err) {
+      if (triggerError) triggerError(err.message || 'Failed to save compliance record');
+    } finally {
+      setLoading(false);
     }
-    setShowModal(false);
-    setEditing(null);
-    setForm(emptyForm);
+  };
+
+  const handleDeleteRecord = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this compliance record?')) return;
+    try {
+      await api.delete(`/compliance/records/${id}`);
+      setRecords(records.filter((r) => r._id !== id));
+      if (triggerError) triggerError('Compliance record deleted', 'success');
+    } catch (err) {
+      if (triggerError) triggerError(err.message || 'Failed to delete record');
+    }
   };
 
   const openEdit = (r) => {
@@ -102,12 +162,15 @@ export default function CompliancePanel({ user, triggerError }) {
             Track all licenses, certifications and regulatory filings for your food manufacturing facility
           </p>
         </div>
-        <button
-          onClick={() => { setEditing(null); setForm(emptyForm); setShowModal(true); }}
-          className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer shrink-0"
-        >
-          <Icon icon="mdi:plus" className="text-sm" /> Add Record
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <ExportDataToolbar data={records} filename="fssai_compliance_records" title="FSSAI & Regulatory Compliance" />
+          <button
+            onClick={() => { setEditing(null); setForm(emptyForm); setShowModal(true); }}
+            className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-sm cursor-pointer shrink-0"
+          >
+            <Icon icon="mdi:plus" className="text-sm" /> Add Record
+          </button>
+        </div>
       </div>
 
       {/* Status Summary */}
@@ -219,7 +282,7 @@ export default function CompliancePanel({ user, triggerError }) {
                           <button onClick={() => openEdit(r)} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg transition cursor-pointer">
                             <Icon icon="mdi:pencil-outline" className="text-sm" />
                           </button>
-                          <button onClick={() => handleDelete(r._id)} className="p-1.5 hover:bg-rose-50 text-rose-500 rounded-lg transition cursor-pointer">
+                          <button onClick={() => handleDeleteRecord(r._id)} className="p-1.5 hover:bg-rose-50 text-rose-500 rounded-lg transition cursor-pointer">
                             <Icon icon="mdi:trash-can-outline" className="text-sm" />
                           </button>
                         </div>

@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import ExportDataToolbar from '../../components/ExportDataToolbar';
+import logo from '../../assets/hero.png';
 import { api } from '../../lib/api';
+import BackButton from '../../components/BackButton';
+import useMountAnimation from '../../lib/useMountAnimation';
+import { useNavigate } from 'react-router-dom';
 
 export default function FactoryPanel({ user, triggerError }) {
   const [factories, setFactories] = useState([]);
+  const mountCls = useMountAnimation();
+  const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -104,7 +110,7 @@ export default function FactoryPanel({ user, triggerError }) {
   };
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className={`space-y-6 font-sans transition duration-300 ease-out ${mountCls}`}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -114,7 +120,52 @@ export default function FactoryPanel({ user, triggerError }) {
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          <ExportDataToolbar data={factories} filename="manufacturing_factories_master" title="Manufacturing Plant Master" />
+          <ExportDataToolbar
+            data={factories.map(f => ({
+              plantCode: f.plantCode || f.code || '',
+              name: f.name || '',
+              location: f.location || '',
+              linesCount: f.linesCount || 0,
+              capacityPerDay: f.capacityPerDay || '',
+              plantManager: f.plantManager || '',
+              status: f.status || '',
+            }))}
+            filename="manufacturing_factories_master"
+            title="Manufacturing Plant Master"
+          />
+          <button
+            onClick={() => {
+              const printWindow = window.open('', '_blank');
+              if (!printWindow) { alert('Please allow popups to enable printing.'); return; }
+              const styles = `@page { size: A4 landscape; margin: 10mm; } body{font-family:Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;color:#0f172a;margin:15px;font-size:11px} .logo{height:40px;margin-bottom:8px} table{width:100%;border-collapse:collapse;margin-top:10px} th,td{border:1px solid #cbd5e1;padding:8px 10px;text-align:left;word-break:break-word} th{background:#ea580c;color:#fff;font-weight:bold} tr:nth-child(even) td { background:#f8fafc; }`;
+              const rows = factories.map(f => `
+                <tr>
+                  <td>${(f.plantCode||f.code||'').replace(/</g,'&lt;')}</td>
+                  <td>${(f.name||'').replace(/</g,'&lt;')}</td>
+                  <td>${(f.location||'').replace(/</g,'&lt;')}</td>
+                  <td>${f.linesCount||0}</td>
+                  <td>${(f.capacityPerDay||'').replace(/</g,'&lt;')}</td>
+                  <td>${(f.plantManager||'').replace(/</g,'&lt;')}</td>
+                  <td>${(f.status||'').replace(/</g,'&lt;')}</td>
+                </tr>`).join('');
+              const html = `
+                <html><head><title>Manufacturing Plants</title><style>${styles}</style></head>
+                <body>
+                  <img src="${logo}" class="logo" />
+                  <h1>Manufacturing Plant Master</h1>
+                  <table>
+                    <thead><tr><th>Plant Code</th><th>Name</th><th>Location</th><th>Lines</th><th>Capacity</th><th>Manager</th><th>Status</th></tr></thead>
+
+                    <tbody>${rows}</tbody>
+                  </table>
+                  <script>window.onload=function(){window.print();setTimeout(()=>window.close(),250)}</script>
+                </body></html>`;
+              printWindow.document.write(html); printWindow.document.close(); printWindow.focus();
+            }}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold flex items-center gap-2 transition"
+          >
+            <Icon icon="mdi:printer" className="text-base" /> Print
+          </button>
           <button
             onClick={() => {
               setFormData({ plantCode: `PLANT-0${factories.length + 1}`, name: '', location: '', linesCount: 2, capacityPerDay: '50,000 Liters', plantManager: 'General Manager', status: 'Operating' });
@@ -132,7 +183,10 @@ export default function FactoryPanel({ user, triggerError }) {
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Icon icon="mdi:factory" className="text-orange-500 text-base" />
-              {editingFactory ? `Edit Plant Configuration (${editingFactory.name})` : 'Register New Manufacturing Plant Facility'}
+                          <div className="w-full sm:w-auto mt-3 sm:mt-0">
+                            <BackButton to="/settings" label="Back" />
+                            <span className="text-xs text-slate-400">Settings / Factories</span>
+                          </div>
             </h3>
             <button type="button" onClick={() => { setShowAddModal(false); setEditingFactory(null); }} className="text-slate-400 hover:text-slate-600 text-sm">✕</button>
           </div>

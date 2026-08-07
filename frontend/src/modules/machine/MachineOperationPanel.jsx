@@ -5,6 +5,8 @@ import { api } from '../../lib/api';
 
 export default function MachineOperationPanel({ user, triggerError }) {
   const [operations, setOperations] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingOp, setEditingOp] = useState(null);
@@ -26,7 +28,10 @@ export default function MachineOperationPanel({ user, triggerError }) {
   const fetchOperations = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/machines');
+      const [res, orderRes] = await Promise.all([
+        api.get('/machines'),
+        api.get('/production/orders'),
+      ]);
       if (res.success && Array.isArray(res.data) && res.data.length > 0) {
         const mapped = res.data.map((m, idx) => ({
           _id: m._id,
@@ -44,11 +49,26 @@ export default function MachineOperationPanel({ user, triggerError }) {
       } else {
         setOperations([]);
       }
+      if (orderRes.success && Array.isArray(orderRes.data)) {
+        setOrders(orderRes.data);
+      }
     } catch (err) {
       console.warn('Failed to load machine operations:', err);
       setOperations([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSelectOrder = (orderId) => {
+    setSelectedOrderId(orderId);
+    if (!orderId) return;
+    const ord = orders.find((o) => o._id === orderId || o.orderNo === orderId);
+    if (ord) {
+      setFormData({
+        ...formData,
+        lineName: `${ord.productName} Production (Batch ${ord.batchId})`,
+      });
     }
   };
 
@@ -100,7 +120,7 @@ export default function MachineOperationPanel({ user, triggerError }) {
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Icon icon="mdi:sine-wave" className="text-orange-500 text-lg" /> Machine Operations & Live Telemetry
           </h2>
-          <p className="text-xs text-slate-400">Real-time SCADA telemetry tracking: temperature, pressure, energy/water usage, operator assignment, and line OEE</p>
+          <p className="text-xs text-slate-400">Real-time SCADA telemetry tracking: temperature, pressure, energy/water usage, and operator assignment</p>
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
@@ -126,6 +146,31 @@ export default function MachineOperationPanel({ user, triggerError }) {
             </h3>
             <button type="button" onClick={() => { setShowAddModal(false); setEditingOp(null); }} className="text-slate-400 hover:text-slate-600 text-sm">✕</button>
           </div>
+
+          {!editingOp && (
+            <div className="bg-orange-50/60 border border-orange-100 p-3 rounded-xl">
+              <label className="text-xs font-bold text-orange-900 block mb-1">
+                Link to Production Order / Batch (Auto-fill)
+              </label>
+              <select
+                value={selectedOrderId}
+                onChange={(e) => handleSelectOrder(e.target.value)}
+                className="w-full bg-white border border-orange-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-orange-200"
+              >
+                <option value="">-- Manual Entry (Or select a Production Order below) --</option>
+                {orders.map((o) => (
+                  <option key={o._id} value={o._id}>
+                    [{o.orderNo || 'PO'}] Batch {o.batchId} - {o.productName} ({o.qtyPlanned} {o.unit || 'Units'})
+                  </option>
+                ))}
+              </select>
+              {selectedOrderId && (
+                <span className="text-[10px] text-orange-700 block mt-1 font-semibold">
+                  ✓ Auto-filled line name from Production Order {selectedOrderId}
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>

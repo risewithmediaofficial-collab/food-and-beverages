@@ -54,15 +54,52 @@ const rfidDeviceSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const shiftSchema = new mongoose.Schema({
+  shiftCode: { type: String, default: '' },
   shiftName: { type: String, required: true },
   startTime: { type: String, default: '08:00 AM' },
   endTime: { type: String, default: '05:00 PM' },
   graceTimeMin: { type: Number, default: 15 },
   breakTimeMin: { type: Number, default: 60 },
   workingHours: { type: Number, default: 8 },
+  assignedWorkers: { type: Number, default: 0 },
+  overtimePolicy: { type: String, default: '1.5x Hourly Rate' },
+  status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
+}, { timestamps: true });
+
+const leaveSchema = new mongoose.Schema({
+  leaveRef: { type: String, default: '' },
+  empId: { type: String, required: true },
+  empName: { type: String, required: true },
+  department: { type: String, default: 'Plant Operations' },
+  leaveType: { type: String, enum: ['Casual Leave', 'Sick Leave', 'Paid Leave', 'Loss Of Pay', 'Maternity Leave', 'Emergency Leave'], default: 'Casual Leave' },
+  startDate: { type: String, required: true },
+  endDate: { type: String, required: true },
+  daysCount: { type: Number, default: 1 },
+  reason: { type: String, default: '' },
+  status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
+  approvedBy: { type: String, default: 'Pending Review' },
+}, { timestamps: true });
+
+const payrollSchema = new mongoose.Schema({
+  slipId: { type: String, default: '' },
+  empId: { type: String, required: true },
+  empName: { type: String, required: true },
+  department: { type: String, default: 'Plant Operations' },
+  designation: { type: String, default: 'Staff' },
+  monthYear: { type: String, required: true },
+  basicPay: { type: Number, default: 0 },
+  hra: { type: Number, default: 0 },
+  overtimePay: { type: Number, default: 0 },
+  pfDeduction: { type: Number, default: 0 },
+  esiDeduction: { type: Number, default: 0 },
+  lateDeduction: { type: Number, default: 0 },
+  netSalary: { type: Number, default: 0 },
+  status: { type: String, enum: ['Paid', 'Pending', 'Held'], default: 'Paid' },
 }, { timestamps: true });
 
 export const Employee = mongoose.models.Employee || mongoose.model('Employee', employeeSchema);
 export const RFIDAttendanceLog = mongoose.models.RFIDAttendanceLog || mongoose.model('RFIDAttendanceLog', rfidAttendanceLogSchema);
 export const RFIDDevice = mongoose.models.RFIDDevice || mongoose.model('RFIDDevice', rfidDeviceSchema);
 export const Shift = mongoose.models.Shift || mongoose.model('Shift', shiftSchema);
+export const Leave = mongoose.models.Leave || mongoose.model('Leave', leaveSchema);
+export const Payroll = mongoose.models.Payroll || mongoose.model('Payroll', payrollSchema);

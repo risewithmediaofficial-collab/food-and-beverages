@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
+import { socket } from '../../lib/socket';
 import { Icon } from '@iconify/react';
+import ExportDataToolbar from '../../components/ExportDataToolbar';
 
 export default function MachinePanel() {
   const [machines, setMachines] = useState([]);
@@ -20,6 +22,14 @@ export default function MachinePanel() {
 
   useEffect(() => {
     fetchMachines();
+    socket.on('machine:status-changed', (payload) => {
+      // payload: { machineId, status, oee, machineName, startedAt, stoppedAt, lastRunDurationMinutes, totalRunMinutes }
+      setMachines((prev) => prev.map((m) => (m._id === payload.machineId ? { ...m, currentStatus: payload.status, oee: payload.oee, startedAt: payload.startedAt, stoppedAt: payload.stoppedAt, lastRunDurationMinutes: payload.lastRunDurationMinutes, totalRunMinutes: payload.totalRunMinutes } : m)));
+    });
+
+    return () => {
+      socket.off('machine:status-changed');
+    };
   }, []);
 
   const fetchMachines = async () => {
@@ -28,7 +38,7 @@ export default function MachinePanel() {
     try {
       const res = await api.get('/machines');
       if (res.success && res.data.length > 0) {
-        setMachines(res.data.map(m => ({ ...m, oee: m.oee || 88.0 })));
+        setMachines(res.data.map(m => ({ ...m })));
       } else {
         setMachines([]);
       }
@@ -61,7 +71,6 @@ export default function MachinePanel() {
       category: newMachine.category,
       capacityUnitsPerHour: Number(newMachine.capacityUnitsPerHour),
       currentStatus: 'idle',
-      oee: 90.0,
     };
 
     try {
@@ -156,12 +165,15 @@ export default function MachinePanel() {
           <p className="text-xs text-slate-400">Anyone logged in can Start / Stop line equipment. Tracks exact start time, stop time & elapsed run duration.</p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 cursor-pointer w-full sm:w-auto"
-        >
-          <Icon icon="mdi:plus" className="text-base" /> Add New Machine
-        </button>
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <ExportDataToolbar data={machines} filename="machine_assets_master" title="Machine Master & Shift Runtime Tracking" />
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 cursor-pointer w-full sm:w-auto"
+          >
+            <Icon icon="mdi:plus" className="text-base" /> Add New Machine
+          </button>
+        </div>
       </div>
 
       {actionError && (
@@ -312,14 +324,10 @@ export default function MachinePanel() {
                   </span>
                 </div>
 
-                <div className="bg-blue-50/60 p-3 rounded-xl border border-blue-100 flex justify-between items-center mt-3">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">OEE Score</span>
-                    <span className="text-lg font-extrabold font-mono text-blue-700">{m.oee || 88}%</span>
-                  </div>
-                  <div className="text-right">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 flex items-center mt-3">
+                  <div className="w-full text-left">
                     <span className="text-[10px] text-slate-400 block uppercase font-bold">Capacity</span>
-                    <span className="text-xs font-mono font-bold text-slate-700">{m.capacityUnitsPerHour} UPH</span>
+                    <span className="text-sm font-mono font-bold text-slate-700">{m.capacityUnitsPerHour} UPH</span>
                   </div>
                 </div>
 

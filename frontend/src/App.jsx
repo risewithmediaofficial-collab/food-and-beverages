@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import ErrorToast from './components/ErrorToast';
-import LoginPanel from './modules/auth/LoginPanel';
 import DashboardPanel from './modules/dashboard/DashboardPanel';
 import CrmPanel from './modules/crm/CrmPanel';
 import SalesPanel from './modules/sales/SalesPanel';
@@ -44,6 +43,9 @@ import MaintenancePanel from './modules/machine/MaintenancePanel';
 import LaboratoryPanel from './modules/quality/LaboratoryPanel';
 import ExpensePanel from './modules/finance/ExpensePanel';
 import CompliancePanel from './modules/compliance/CompliancePanel';
+import LoginPanel from './modules/auth/LoginPanel';
+import SuperAdminLogin from './modules/superadmin/SuperAdminLogin';
+import SuperAdminDashboard from './modules/superadmin/SuperAdminDashboard';
 import { getModuleIdFromPath, MODULE_MAP } from './moduleRoutes';
 import { canAccessModule, firstAccessibleModule } from './accessControl';
 
@@ -55,6 +57,7 @@ function App() {
   const [notification, setNotification] = useState({ message: '', type: 'error' });
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [inspectedOrg, setInspectedOrg] = useState(null);
 
   const triggerError = useCallback((msg, type = 'error') => {
     setNotification({ message: msg, type });
@@ -75,12 +78,19 @@ function App() {
       try {
         const parsed = JSON.parse(savedUser);
         setUser(parsed);
-        setDefaultModuleForUser(parsed);
+        if (location.pathname === '/' || location.pathname === '/login' || location.pathname === '/superadmin/login') {
+          if (parsed.isSuperAdmin) {
+            navigate('/superadmin', { replace: true });
+          } else {
+            setActiveModule('dashboard');
+            navigate('/dashboard', { replace: true });
+          }
+        }
       } catch {
         setUser(null);
       }
     }
-  }, []);
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     const moduleId = getModuleIdFromPath(location.pathname);
@@ -88,7 +98,7 @@ function App() {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!user || canAccessModule(user, activeModule)) return;
+    if (!user || user.isSuperAdmin || canAccessModule(user, activeModule)) return;
     const fallbackModule = firstAccessibleModule(user);
     setActiveModule(fallbackModule);
     navigate(MODULE_MAP[fallbackModule]?.path || '/dashboard', { replace: true });
@@ -96,33 +106,54 @@ function App() {
   }, [activeModule, navigate, triggerError, user]);
 
   const setDefaultModuleForUser = (userData) => {
-    const dept = userData?.department || 'Executive';
-    let defaultModule = 'dashboard';
-    if (dept === 'Operations & Maintenance') defaultModule = 'machine';
-    else if (dept === 'QA & Food Safety Lab') defaultModule = 'quality';
-    else if (dept === 'Accounts & Ledger') defaultModule = 'finance';
-    else if (dept === 'Plant Operations') defaultModule = 'production';
-    else if (dept === 'Sales & Marketing') defaultModule = 'sales';
-    else if (dept === 'Supply Chain') defaultModule = 'inventory';
-    const allowedDefault = canAccessModule(userData, defaultModule) ? defaultModule : firstAccessibleModule(userData);
+    const allowedDefault = canAccessModule(userData, 'dashboard') ? 'dashboard' : firstAccessibleModule(userData);
     setActiveModule(allowedDefault);
     navigate(MODULE_MAP[allowedDefault]?.path || '/dashboard');
   };
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
-    setDefaultModuleForUser(userData);
+    if (userData.isSuperAdmin) {
+      navigate('/superadmin', { replace: true });
+    } else {
+      setDefaultModuleForUser(userData);
+    }
   };
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
+    localStorage.removeItem('inspected_org_id');
     setUser(null);
+    setInspectedOrg(null);
     navigate('/login');
   };
 
-  if (!user) {
+  // Super Admin view mode (render SuperAdminDashboard when superadmin is logged in and not inspecting an org)
+  if (user && user.isSuperAdmin && !inspectedOrg) {
+    return (
+      <SuperAdminDashboard
+        user={user}
+        onLogout={handleLogout}
+        onSelectOrgForInspection={(org) => {
+          localStorage.setItem('inspected_org_id', org._id);
+          setInspectedOrg(org);
+        }}
+      />
+    );
+  }
+
+  // Route: /login — render tenant login panel, /superadmin/login renders superadmin login
+  if (location.pathname === '/login') {
     return <LoginPanel onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  if (location.pathname === '/superadmin/login') {
+    return <SuperAdminLogin onSuperAdminLoginSuccess={handleLoginSuccess} />;
+  }
+
+  if (!user) {
+    return <SuperAdminLogin onSuperAdminLoginSuccess={handleLoginSuccess} />;
   }
 
   const renderActiveModule = () => {
@@ -188,9 +219,28 @@ function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {inspectedOrg && (
+          <div className="bg-amber-500 text-slate-950 text-xs font-bold px-4 py-2 flex items-center justify-between shadow-md shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="bg-slate-950 text-amber-400 text-[10px] px-2 py-0.5 rounded-full uppercase font-mono">
+                Super Admin Inspection Mode
+              </span>
+              <span>Viewing Organization: <strong>{inspectedOrg.name}</strong> ({inspectedOrg.planType})</span>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.removeItem('inspected_org_id');
+                setInspectedOrg(null);
+              }}
+              className="bg-slate-950 hover:bg-slate-900 text-white text-[11px] px-3 py-1 rounded-lg font-bold cursor-pointer"
+            >
+              Exit Inspection & Return to Super Admin Portal ✕
+            </button>
+          </div>
+        )}
         <Header
           activeModule={activeModule}
-          user={user}
+          user={inspectedOrg ? { ...user, orgName: inspectedOrg.name } : user}
           onMenuToggle={() => {
             if (window.innerWidth < 1024) {
               setSidebarOpen((prev) => !prev);

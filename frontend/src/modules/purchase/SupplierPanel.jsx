@@ -61,12 +61,12 @@ export default function SupplierPanel({ user, triggerError }) {
       const res = await api.post('/purchase/suppliers', payload);
       if (res.success && res.data) {
         setSuppliers([res.data, ...suppliers]);
+        setShowAddModal(false);
+        setFormData({ vendorCode: '', name: '', category: 'Fruit Pulp & Concentrate', rating: '5.0 ⭐', gstin: '', contactPerson: '', phone: '', email: '', paymentTerms: 'Net 30 Days', status: 'Approved' });
+        if (triggerError) triggerError('Supplier registered successfully!', 'success');
       } else {
-        setSuppliers([{ _id: Date.now().toString(), ...payload }, ...suppliers]);
+        throw new Error(res.message || 'Failed to register supplier');
       }
-      setShowAddModal(false);
-      setFormData({ vendorCode: '', name: '', category: 'Fruit Pulp & Concentrate', rating: '5.0 ⭐', gstin: '', contactPerson: '', phone: '', email: '', paymentTerms: 'Net 30 Days', status: 'Approved' });
-      if (triggerError) triggerError('Supplier registered successfully!', 'success');
     } catch (err) {
       if (triggerError) triggerError(err.message || 'Failed to register supplier');
     } finally {

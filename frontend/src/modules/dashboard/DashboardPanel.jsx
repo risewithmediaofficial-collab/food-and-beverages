@@ -12,6 +12,54 @@ import { canAccessModule, isAdminUser } from '../../accessControl';
 const fmt = (n) => (n ?? 0).toLocaleString('en-IN');
 const fmtCurr = (n) => `₹${((n ?? 0) / 1000).toFixed(1)}K`;
 
+const printDashboardPDF = (title, rows = []) => {
+  if (!rows || rows.length === 0) {
+    alert('No dashboard data available to export.');
+    return;
+  }
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Unable to open print window. Please allow popups and try again.');
+    return;
+  }
+
+  const styles = `
+    body { font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #0f172a; margin: 24px; }
+    h1 { font-size: 24px; margin-bottom: 18px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+    th, td { border: 1px solid #d1d5db; padding: 12px 14px; text-align: left; vertical-align: top; }
+    th { background: #fb923c; color: #fff; font-weight: 700; }
+    tr:nth-child(even) td { background: #f8fafc; }
+    @media print { body { margin: 0; } button { display: none; } }
+  `;
+
+  const html = `
+    <html>
+      <head>
+        <title>${title}</title>
+        <style>${styles}</style>
+      </head>
+      <body>
+        <h1>${title}</h1>
+        <table>
+          <thead>
+            <tr><th>Metric</th><th>Value</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(([label, value]) => `<tr><td>${label}</td><td>${value}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        <script>window.onload = function() { window.print(); setTimeout(() => window.close(), 200); };</script>
+      </body>
+    </html>
+  `;
+
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.focus();
+};
+
 function StatCard({ icon, iconBg, iconColor, label, value, sub, subColor = 'text-slate-400', badge, badgeColor, onClick }) {
   return (
     <div
@@ -74,7 +122,6 @@ const ROLE_DASHBOARD_TILES = [
 export default function DashboardPanel({ user }) {
   const [kpis, setKpis] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState(null);
   const navigate = useNavigate();
 
   const fetchKPIs = async () => {
@@ -83,7 +130,6 @@ export default function DashboardPanel({ user }) {
       const res = await api.get('/dashboard/factory-overview');
       if (res?.data?.kpis) {
         setKpis(res.data.kpis);
-        setLastUpdated(new Date());
       } else {
         setKpis({});
       }
@@ -101,15 +147,17 @@ export default function DashboardPanel({ user }) {
     socket.on('dashboard:kpi-tick', (data) => {
       if (data?.kpis) {
         setKpis((prev) => ({ ...prev, ...data.kpis }));
-        setLastUpdated(new Date());
       }
     });
 
-    // Auto-refresh every 60 seconds
-    const interval = setInterval(fetchKPIs, 60000);
+    // Update KPIs when machine status changes (OEE updates)
+    socket.on('machine:status-changed', () => {
+      fetchKPIs();
+    });
+
     return () => {
       socket.off('dashboard:kpi-tick');
-      clearInterval(interval);
+      socket.off('machine:status-changed');
     };
   }, []);
 
@@ -197,34 +245,33 @@ export default function DashboardPanel({ user }) {
           </div>
 
           <div className="flex gap-3 shrink-0">
-            <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-center">
-              <span className="text-[10px] text-orange-600 block font-bold uppercase tracking-wider">OEE Score</span>
-              <span className="text-xl font-extrabold text-orange-600 mt-0.5 block">
-                {kpi.avgOEE ? `${kpi.avgOEE}%` : '—'}
-              </span>
-            </div>
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-center">
               <span className="text-[10px] text-emerald-600 block font-bold uppercase tracking-wider">Machines</span>
               <span className="text-xl font-extrabold text-emerald-600 mt-0.5 block">
                 {kpi.totalMachines ? `${kpi.runningMachines || 0}/${kpi.totalMachines}` : '—'}
               </span>
             </div>
+            <button
+              onClick={() => printDashboardPDF('Dashboard Summary', [
+                ['Total Organizations', kpi.totalOrgs || 0],
+                ['Active Organizations', kpi.activeOrgs || 0],
+                ['Pending Requests', kpi.pendingRequests || 0],
+                ['Total Users', kpi.totalUsers || 0],
+                ['Active Sales Orders', kpi.totalSalesOrders || 0],
+                ['Production Batches', kpi.activeProductionOrders || 0],
+                ['Quality Checks', kpi.totalQCChecks || 0],
+                ['Active Dispatches', kpi.activeDispatches || 0],
+                // OEE removed from display per user request
+                ['Running Machines', kpi.totalMachines ? `${kpi.runningMachines || 0}/${kpi.totalMachines}` : '—'],
+              ])}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold flex items-center gap-2 transition"
+            >
+              <Icon icon="mdi:printer" className="text-base" /> Print Dashboard
+            </button>
           </div>
         </div>
 
-        {/* Refresh row */}
-        <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
-          <span className="text-[10px] text-slate-400">
-            {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Loading...'}
-          </span>
-          <button
-            onClick={fetchKPIs}
-            className="flex items-center gap-1 text-[10px] font-bold text-orange-500 hover:text-orange-700 transition cursor-pointer"
-          >
-            <Icon icon="mdi:refresh" className={`text-sm ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-        </div>
+
       </div>
 
 
@@ -371,7 +418,7 @@ export default function DashboardPanel({ user }) {
                 iconColor="text-cyan-600"
                 label="Machine Assets"
                 value={fmt(kpi.totalMachines)}
-                sub={`${fmt(kpi.runningMachines)} running · OEE ${kpi.avgOEE || 0}%`}
+                sub={`${fmt(kpi.runningMachines)} running`}
                 badge={kpi.runningMachines > 0 ? 'Online' : 'Idle'}
                 badgeColor={kpi.runningMachines > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}
                 onClick={() => go('/machine')}

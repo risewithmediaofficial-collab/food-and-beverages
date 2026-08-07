@@ -57,12 +57,12 @@ export default function CustomerPanel({ user, triggerError }) {
       const res = await api.post('/crm/customers', payload);
       if (res.success && res.data) {
         setCustomers([res.data, ...customers]);
+        setShowAddModal(false);
+        setFormData({ name: '', category: 'Hotel & Hospitality', creditLimit: 500000, contactPerson: '', phone: '', email: '', gstin: '' });
+        if (triggerError) triggerError('Customer account registered!', 'success');
       } else {
-        setCustomers([{ _id: Date.now().toString(), ...payload }, ...customers]);
+        throw new Error(res.message || 'Failed to register customer');
       }
-      setShowAddModal(false);
-      setFormData({ name: '', category: 'Hotel & Hospitality', creditLimit: 500000, contactPerson: '', phone: '', email: '', gstin: '' });
-      if (triggerError) triggerError('Customer account registered!', 'success');
     } catch (err) {
       if (triggerError) triggerError(err.message || 'Failed to register customer');
     } finally {

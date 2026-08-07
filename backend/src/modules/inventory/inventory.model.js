@@ -51,3 +51,19 @@ const stockMovementSchema = new mongoose.Schema({
 export const Item = mongoose.models.Item || mongoose.model('Item', itemSchema);
 export const StockBatch = mongoose.models.StockBatch || mongoose.model('StockBatch', stockBatchSchema);
 export const StockMovement = mongoose.models.StockMovement || mongoose.model('StockMovement', stockMovementSchema);
+
+const warehouseSchema = new mongoose.Schema({
+  whCode: { type: String, required: true, unique: true },
+  whName: { type: String, required: true },
+  location: { type: String, default: '' },
+  storageType: { type: String, default: 'Cold Storage (Puree & Concentrate)' },
+  totalCapacity: { type: String, default: '50,000 Kg' },
+  occupiedPct: { type: Number, default: 0, min: 0, max: 100 },
+  racksCount: { type: Number, default: 0 },
+  manager: { type: String, default: 'Warehouse Manager' },
+  status: { type: String, enum: ['Optimal', 'Near Full', 'Full', 'Maintenance'], default: 'Optimal' },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+
+export const Warehouse = mongoose.models.Warehouse || mongoose.model('Warehouse', warehouseSchema);
+

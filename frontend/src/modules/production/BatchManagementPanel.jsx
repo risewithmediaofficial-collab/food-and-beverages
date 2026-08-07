@@ -5,6 +5,8 @@ import { api } from '../../lib/api';
 
 export default function BatchManagementPanel({ user, triggerError }) {
   const [batches, setBatches] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingBatch, setEditingBatch] = useState(null);
@@ -25,17 +27,39 @@ export default function BatchManagementPanel({ user, triggerError }) {
   const fetchBatches = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/production/batches');
-      if (res.success && Array.isArray(res.data)) {
-        setBatches(res.data);
+      const [batchRes, orderRes] = await Promise.all([
+        api.get('/production/batches'),
+        api.get('/production/orders'),
+      ]);
+      if (batchRes.success && Array.isArray(batchRes.data)) {
+        setBatches(batchRes.data);
       } else {
         setBatches([]);
+      }
+      if (orderRes.success && Array.isArray(orderRes.data)) {
+        setOrders(orderRes.data);
       }
     } catch (err) {
       console.warn('Failed to load batches from API:', err);
       setBatches([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSelectOrder = (orderId) => {
+    setSelectedOrderId(orderId);
+    if (!orderId) return;
+    const ord = orders.find((o) => o._id === orderId || o.orderNo === orderId || o.batchId === orderId);
+    if (ord) {
+      setFormData({
+        ...formData,
+        batchNo: ord.batchId || `BATCH-${ord.orderNo}`,
+        productName: ord.productName || ord.productId?.name || 'Juice Product',
+        plannedQty: ord.qtyPlanned || 5000,
+        producedQty: ord.qtyProduced || Math.round((ord.qtyPlanned || 5000) * 0.97),
+        yieldPct: 97.0,
+      });
     }
   };
 
@@ -59,12 +83,12 @@ export default function BatchManagementPanel({ user, triggerError }) {
       const res = await api.post('/production/batches', payload);
       if (res.success && res.data) {
         setBatches([res.data, ...batches]);
+        setShowAddModal(false);
+        setFormData({ batchNo: '', productName: '', plannedQty: 5000, producedQty: 4850, yieldPct: 97.0, lineCode: 'MAC-FIL-01', qcStatus: 'Quarantined' });
+        if (triggerError) triggerError('Production batch created!', 'success');
       } else {
-        setBatches([{ _id: Date.now().toString(), ...payload }, ...batches]);
+        throw new Error(res.message || 'Failed to create batch');
       }
-      setShowAddModal(false);
-      setFormData({ batchNo: '', productName: '', plannedQty: 5000, producedQty: 4850, yieldPct: 97.0, lineCode: 'MAC-FIL-01', qcStatus: 'Quarantined' });
-      if (triggerError) triggerError('Production batch created!', 'success');
     } catch (err) {
       if (triggerError) triggerError(err.message || 'Failed to create batch');
     } finally {
@@ -152,6 +176,31 @@ export default function BatchManagementPanel({ user, triggerError }) {
             </h3>
             <button type="button" onClick={() => { setShowAddModal(false); setEditingBatch(null); }} className="text-slate-400 hover:text-slate-600 text-sm">✕</button>
           </div>
+
+          {!editingBatch && (
+            <div className="bg-orange-50/60 border border-orange-100 p-3 rounded-xl">
+              <label className="text-xs font-bold text-orange-900 block mb-1">
+                Select Issued Production Order / Batch (Auto-fill)
+              </label>
+              <select
+                value={selectedOrderId}
+                onChange={(e) => handleSelectOrder(e.target.value)}
+                className="w-full bg-white border border-orange-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-orange-200"
+              >
+                <option value="">-- Custom Manual Entry (Or select a Production Order below) --</option>
+                {orders.map((o) => (
+                  <option key={o._id} value={o._id}>
+                    [{o.orderNo || 'PO'}] Batch {o.batchId} - {o.productName} ({o.qtyPlanned} {o.unit || 'Units'})
+                  </option>
+                ))}
+              </select>
+              {selectedOrderId && (
+                <span className="text-[10px] text-orange-700 block mt-1 font-semibold">
+                  ✓ Auto-filled details from Production Order {selectedOrderId}
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>

@@ -56,12 +56,20 @@ export default function ExpensePanel({ user, triggerError }) {
       setLoading(true);
       if (editing) {
         const res = await api.put(`/finance/expenses/${editing._id}`, form);
-        setExpenses(expenses.map((ex) => (ex._id === editing._id ? (res.data || { ...editing, ...form }) : ex)));
-        if (triggerError) triggerError('Expense updated!', 'success');
+        if (res.success && res.data) {
+          setExpenses(expenses.map((ex) => (ex._id === editing._id ? res.data : ex)));
+          if (triggerError) triggerError('Expense updated!', 'success');
+        } else {
+          throw new Error(res.message || 'Failed to update expense');
+        }
       } else {
         const res = await api.post('/finance/expenses', form);
-        setExpenses([res.data || { _id: Date.now().toString(), ...form }, ...expenses]);
-        if (triggerError) triggerError('Expense recorded!', 'success');
+        if (res.success && res.data) {
+          setExpenses([res.data, ...expenses]);
+          if (triggerError) triggerError('Expense recorded!', 'success');
+        } else {
+          throw new Error(res.message || 'Failed to record expense');
+        }
       }
       setShowModal(false);
       setEditing(null);

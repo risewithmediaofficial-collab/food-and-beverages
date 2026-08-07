@@ -59,12 +59,12 @@ export default function LeadManagementPanel({ user, triggerError }) {
       const res = await api.post('/crm/leads', payload);
       if (res.success && res.data) {
         setLeads([res.data, ...leads]);
+        setShowAddModal(false);
+        setFormData({ leadCode: '', name: '', company: '', email: '', phone: '', dealValue: 150000, stage: 'New', source: 'Website Inquiry', assignee: 'Rohan Gupta' });
+        if (triggerError) triggerError('Sales lead opportunity created!', 'success');
       } else {
-        setLeads([{ _id: Date.now().toString(), ...payload }, ...leads]);
+        throw new Error(res.message || 'Failed to create lead');
       }
-      setShowAddModal(false);
-      setFormData({ leadCode: '', name: '', company: '', email: '', phone: '', dealValue: 150000, stage: 'New', source: 'Website Inquiry', assignee: 'Rohan Gupta' });
-      if (triggerError) triggerError('Sales lead opportunity created!', 'success');
     } catch (err) {
       if (triggerError) triggerError(err.message || 'Failed to create lead');
     } finally {

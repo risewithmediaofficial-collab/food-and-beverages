@@ -3,7 +3,6 @@ import app from './app.js';
 import { config } from './config/env.js';
 import { connectDB } from './config/db.js';
 import { initSocket } from './config/socket.js';
-import { ensureDefaultUsers } from './modules/auth/auth.routes.js';
 
 const server = http.createServer(app);
 
@@ -32,7 +31,7 @@ server.on('error', (err) => {
 const startServer = async () => {
   const isConnected = await connectDB();
   if (isConnected) {
-    await ensureDefaultUsers();
+    // Default user seeding disabled to require manual creation by Org Admins
   } else {
     console.error('[Startup] Database connection failed. Server will still start, but some features may not be available.');
   }

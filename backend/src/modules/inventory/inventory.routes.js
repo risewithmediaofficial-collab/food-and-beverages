@@ -1,5 +1,5 @@
 import express from 'express';
-import { Item, StockBatch } from './inventory.model.js';
+import { Item, StockBatch, Warehouse } from './inventory.model.js';
 import { inventoryService } from './inventory.service.js';
 
 const router = express.Router();
@@ -96,6 +96,45 @@ router.post('/stock-out', async (req, res) => {
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+// Warehouse CRUD
+router.get('/warehouses', async (req, res) => {
+  try {
+    const warehouses = await Warehouse.find({ isActive: true }).sort({ createdAt: -1 });
+    res.json({ success: true, data: warehouses });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.post('/warehouses', async (req, res) => {
+  try {
+    const wh = new Warehouse(req.body);
+    await wh.save();
+    res.status(201).json({ success: true, data: wh });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+router.put('/warehouses/:id', async (req, res) => {
+  try {
+    const wh = await Warehouse.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!wh) return res.status(404).json({ success: false, message: 'Warehouse not found' });
+    res.json({ success: true, data: wh });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+router.delete('/warehouses/:id', async (req, res) => {
+  try {
+    await Warehouse.findByIdAndUpdate(req.params.id, { isActive: false });
+    res.json({ success: true, message: 'Warehouse removed successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

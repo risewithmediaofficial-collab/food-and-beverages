@@ -7,9 +7,21 @@ export default defineConfig({
   server: {
     port: 5174,
     strictPort: false,
-    host: '127.0.0.1',
+    // Bind to localhost and ensure HMR connects to the same origin/port
+    host: 'localhost',
     hmr: {
       host: 'localhost',
+      protocol: 'ws',
+      port: 5174,
+      // Ensure the injected client uses this port (helps when proxies or cache cause mismatches)
+      clientPort: 5174,
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 })

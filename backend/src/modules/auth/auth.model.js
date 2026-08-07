@@ -1,7 +1,8 @@
 import mongoose from 'mongoose';
 
 const roleSchema = new mongoose.Schema({
-  name: { type: String, required: true, unique: true },
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
+  name: { type: String, required: true },
   roleName: { type: String },
   accessLevel: { type: String, default: 'Custom Access' },
   permissions: [{ type: String }],
@@ -10,7 +11,13 @@ const roleSchema = new mongoose.Schema({
   status: { type: String, default: 'Active' },
 }, { timestamps: true });
 
+roleSchema.index({ orgId: 1, name: 1 }, { unique: true, partialFilterExpression: { orgId: { $exists: true, $ne: null } } });
+roleSchema.index({ orgId: 1, roleName: 1 }, { unique: true, partialFilterExpression: { orgId: { $exists: true, $ne: null } } });
+
 const userSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
+  isSuperAdmin: { type: Boolean, default: false },
+  isOrgAdmin: { type: Boolean, default: false },
   empId: { type: String },
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
@@ -30,4 +37,5 @@ const userSchema = new mongoose.Schema({
 
 export const Role = mongoose.models.Role || mongoose.model('Role', roleSchema);
 export const User = mongoose.models.User || mongoose.model('User', userSchema);
+
 

@@ -43,7 +43,7 @@ export default function ReportsPanel({ user, triggerError }) {
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Icon icon="mdi:file-chart-outline" className="text-orange-500 text-lg" /> Executive Reports & Document Export
           </h2>
-          <p className="text-xs text-slate-400">Generate commercial-grade PDF and Excel reports for Sales, Inventory, Production, Machine OEE & Finance</p>
+          <p className="text-xs text-slate-400">Generate commercial-grade PDF and Excel reports for Sales, Inventory, Production & Finance</p>
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
@@ -90,7 +90,7 @@ export default function ReportsPanel({ user, triggerError }) {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
               >
                 <option value="Finance">Finance & Tax</option>
-                <option value="Production">Production & Machine OEE</option>
+                <option value="Production">Production</option>
                 <option value="Inventory">Inventory & FEFO</option>
                 <option value="Quality">Quality Control (QC)</option>
                 <option value="Sales">Sales & CRM</option>

@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { Icon } from '@iconify/react';
 
+import ExportDataToolbar from '../../components/ExportDataToolbar';
+
 export default function QualityPanel({ triggerInfo }) {
   const [checks, setChecks] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [pendingQcCount, setPendingQcCount] = useState(0);
@@ -30,11 +34,17 @@ export default function QualityPanel({ triggerInfo }) {
     setIsLoading(true);
     setLoadError('');
     try {
-      const res = await api.get('/quality/checks');
+      const [res, orderRes] = await Promise.all([
+        api.get('/quality/checks'),
+        api.get('/production/orders'),
+      ]);
       if (res.success && Array.isArray(res.data)) {
         setChecks(res.data);
       } else {
         setChecks([]);
+      }
+      if (orderRes.success && Array.isArray(orderRes.data)) {
+        setOrders(orderRes.data);
       }
     } catch (err) {
       console.warn('Unable to load QC checks from backend.', err);
@@ -42,6 +52,18 @@ export default function QualityPanel({ triggerInfo }) {
       setChecks([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSelectOrder = (orderId) => {
+    setSelectedOrderId(orderId);
+    if (!orderId) return;
+    const ord = orders.find((o) => o._id === orderId || o.orderNo === orderId);
+    if (ord) {
+      setNewCheck({
+        ...newCheck,
+        batchId: ord.batchId || `PO-${ord.orderNo}`,
+      });
     }
   };
 
@@ -125,12 +147,15 @@ export default function QualityPanel({ triggerInfo }) {
           <p className="text-xs text-slate-400">Incoming raw materials, Brix sugar/pH titration testing, and Pass/Rework/Reject decision routing</p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 cursor-pointer w-full sm:w-auto"
-        >
-          <Icon icon="mdi:plus" className="text-base" /> New QC Inspection
-        </button>
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <ExportDataToolbar data={checks} filename="quality_control_checks" title="Quality Inspection Checks" />
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 cursor-pointer w-full sm:w-auto"
+          >
+            <Icon icon="mdi:plus" className="text-base" /> New QC Check
+          </button>
+        </div>
       </div>
 
       {pendingQcCount > 0 && (
@@ -150,7 +175,33 @@ export default function QualityPanel({ triggerInfo }) {
       {/* Add QC Check Modal */}
       {showAddModal && (
         <form onSubmit={handleCreateCheck} className="bg-white border border-blue-200 p-5 rounded-2xl space-y-4 shadow-sm">
-          <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wider">New Quality Inspection Check</h3>
+          <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wider flex items-center gap-2">
+            <Icon icon="mdi:shield-check-outline" className="text-blue-600 text-base" /> New Quality Inspection Check
+          </h3>
+
+          <div className="bg-blue-50/60 border border-blue-100 p-3 rounded-xl">
+            <label className="text-xs font-bold text-blue-900 block mb-1">
+              Select Production Order / Batch for Quality Testing (Auto-fill)
+            </label>
+            <select
+              value={selectedOrderId}
+              onChange={(e) => handleSelectOrder(e.target.value)}
+              className="w-full bg-white border border-blue-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              <option value="">-- Manual Entry (Or select a Production Order below) --</option>
+              {orders.map((o) => (
+                <option key={o._id} value={o._id}>
+                  [{o.orderNo || 'PO'}] Batch {o.batchId} - {o.productName} ({o.qtyPlanned} {o.unit || 'Units'})
+                </option>
+              ))}
+            </select>
+            {selectedOrderId && (
+              <span className="text-[10px] text-blue-700 block mt-1 font-semibold">
+                ✓ Auto-filled Batch ID from Production Order {selectedOrderId}
+              </span>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="text-xs text-slate-600 block mb-1">Batch ID / Number</label>

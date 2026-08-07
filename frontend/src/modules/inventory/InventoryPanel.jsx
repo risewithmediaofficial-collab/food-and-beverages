@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { Icon } from '@iconify/react';
+import ExportDataToolbar from '../../components/ExportDataToolbar';
 import UnitSelector from '../../components/UnitSelector';
 
 export default function InventoryPanel() {
@@ -186,7 +187,8 @@ export default function InventoryPanel() {
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <ExportDataToolbar data={activeTab === 'catalog' ? items : batches} filename={activeTab === 'catalog' ? 'inventory_items_catalog' : 'inventory_fifo_batches'} title={activeTab === 'catalog' ? 'Inventory Items Catalog' : 'Inventory FIFO Batches'} />
           <button
             onClick={() => setShowAddItemModal(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20 cursor-pointer flex-1 sm:flex-initial"

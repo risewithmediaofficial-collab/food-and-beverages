@@ -1,46 +1,75 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import ExportDataToolbar from '../../components/ExportDataToolbar';
+import { api } from '../../lib/api';
+
+const EMPTY_LEAVE = {
+  empId: '',
+  empName: '',
+  department: 'Plant Operations',
+  leaveType: 'Casual Leave',
+  startDate: new Date().toISOString().split('T')[0],
+  endDate: new Date().toISOString().split('T')[0],
+  daysCount: 1,
+  reason: '',
+};
 
 export default function LeavePanel({ user, triggerError }) {
   const [leaves, setLeaves] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showApplyModal, setShowApplyModal] = useState(false);
-  const [editingLeave, setEditingLeave] = useState(null);
-  const [newLeave, setNewLeave] = useState({
-    empId: 'EMP-103',
-    empName: '',
-    department: 'Plant Operations',
-    leaveType: 'Casual Leave',
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-    daysCount: 1,
-    reason: '',
-  });
+  const [newLeave, setNewLeave] = useState(EMPTY_LEAVE);
 
-  const handleApplyLeave = (e) => {
+  useEffect(() => { fetchLeaves(); }, []);
+
+  const fetchLeaves = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/hr/leaves');
+      setLeaves(res?.data || []);
+    } catch (err) {
+      console.warn('Leave fetch failed:', err);
+      setLeaves([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApplyLeave = async (e) => {
     e.preventDefault();
-    const created = {
-      _id: Date.now().toString(),
-      leaveRef: `LEV-2026-0${leaves.length + 1}`,
-      ...newLeave,
-      status: 'Pending',
-      approvedBy: 'Pending Review',
-    };
-    setLeaves([created, ...leaves]);
-    setShowApplyModal(false);
-    setNewLeave({ empId: 'EMP-103', empName: '', department: 'Plant Operations', leaveType: 'Casual Leave', startDate: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0], daysCount: 1, reason: '' });
-    if (triggerError) triggerError('Leave application submitted!', 'success');
+    try {
+      const res = await api.post('/hr/leaves', newLeave);
+      setLeaves([res.data, ...leaves]);
+      setShowApplyModal(false);
+      setNewLeave(EMPTY_LEAVE);
+      if (triggerError) triggerError('Leave application submitted!', 'success');
+    } catch (err) {
+      if (triggerError) triggerError(err?.message || 'Failed to submit leave', 'error');
+    }
   };
 
-  const handleUpdateStatus = (id, newStatus) => {
-    setLeaves(leaves.map(l => l._id === id ? { ...l, status: newStatus, approvedBy: 'Super Admin (GM)' } : l));
-    if (triggerError) triggerError(`Leave status updated to ${newStatus}`, 'success');
+  const handleUpdateStatus = async (id, newStatus) => {
+    try {
+      const res = await api.put(`/hr/leaves/${id}`, {
+        status: newStatus,
+        approvedBy: newStatus === 'Approved' ? (user?.name || 'General Manager') : 'Rejected',
+      });
+      setLeaves(leaves.map(l => l._id === id ? res.data : l));
+      if (triggerError) triggerError(`Leave status updated to ${newStatus}`, 'success');
+    } catch (err) {
+      if (triggerError) triggerError(err?.message || 'Failed to update status', 'error');
+    }
   };
 
-  const handleDeleteLeave = (id) => {
+  const handleDeleteLeave = async (id) => {
     if (!window.confirm('Delete this leave application?')) return;
-    setLeaves(leaves.filter(l => l._id !== id));
-    if (triggerError) triggerError('Leave application removed!', 'success');
+    try {
+      await api.delete(`/hr/leaves/${id}`);
+      setLeaves(leaves.filter(l => l._id !== id));
+      if (triggerError) triggerError('Leave application removed!', 'success');
+    } catch (err) {
+      if (triggerError) triggerError(err?.message || 'Failed to delete leave', 'error');
+    }
   };
 
   return (
@@ -56,10 +85,7 @@ export default function LeavePanel({ user, triggerError }) {
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
           <ExportDataToolbar data={leaves} filename="employee_leaves_report" title="Employee Leave Report" />
           <button
-            onClick={() => {
-              setNewLeave({ empId: 'EMP-103', empName: '', department: 'Plant Operations', leaveType: 'Casual Leave', startDate: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0], daysCount: 1, reason: '' });
-              setShowApplyModal(true);
-            }}
+            onClick={() => { setNewLeave(EMPTY_LEAVE); setShowApplyModal(true); }}
             className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-orange-500/20 cursor-pointer"
           >
             <Icon icon="mdi:plus" className="text-base" /> Apply New Leave
@@ -79,22 +105,15 @@ export default function LeavePanel({ user, triggerError }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="text-xs text-slate-600 font-bold block mb-1">Employee Name *</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Rohan Gupta"
-                value={newLeave.empName}
-                onChange={(e) => setNewLeave({ ...newLeave, empName: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
-              />
+              <input type="text" required placeholder="e.g. Rohan Gupta" value={newLeave.empName} onChange={(e) => setNewLeave({ ...newLeave, empName: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 font-bold block mb-1">Employee ID</label>
+              <input type="text" placeholder="EMP-101" value={newLeave.empId} onChange={(e) => setNewLeave({ ...newLeave, empId: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none font-mono uppercase" />
             </div>
             <div>
               <label className="text-xs text-slate-600 font-bold block mb-1">Leave Type</label>
-              <select
-                value={newLeave.leaveType}
-                onChange={(e) => setNewLeave({ ...newLeave, leaveType: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
-              >
+              <select value={newLeave.leaveType} onChange={(e) => setNewLeave({ ...newLeave, leaveType: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none">
                 <option value="Casual Leave">Casual Leave (CL)</option>
                 <option value="Sick Leave">Sick Leave (SL)</option>
                 <option value="Paid Leave">Earned / Paid Leave (PL)</option>
@@ -104,36 +123,21 @@ export default function LeavePanel({ user, triggerError }) {
               </select>
             </div>
             <div>
+              <label className="text-xs text-slate-600 font-bold block mb-1">Department</label>
+              <input type="text" value={newLeave.department} onChange={(e) => setNewLeave({ ...newLeave, department: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none" />
+            </div>
+            <div>
               <label className="text-xs text-slate-600 font-bold block mb-1">Start Date *</label>
-              <input
-                type="date"
-                required
-                value={newLeave.startDate}
-                onChange={(e) => setNewLeave({ ...newLeave, startDate: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none font-mono"
-              />
+              <input type="date" required value={newLeave.startDate} onChange={(e) => setNewLeave({ ...newLeave, startDate: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none font-mono" />
             </div>
             <div>
               <label className="text-xs text-slate-600 font-bold block mb-1">End Date *</label>
-              <input
-                type="date"
-                required
-                value={newLeave.endDate}
-                onChange={(e) => setNewLeave({ ...newLeave, endDate: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none font-mono"
-              />
+              <input type="date" required value={newLeave.endDate} onChange={(e) => setNewLeave({ ...newLeave, endDate: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none font-mono" />
             </div>
-          </div>
-          <div>
-            <label className="text-xs text-slate-600 font-bold block mb-1">Reason for Leave *</label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Family function / Medical rest"
-              value={newLeave.reason}
-              onChange={(e) => setNewLeave({ ...newLeave, reason: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
-            />
+            <div className="sm:col-span-2">
+              <label className="text-xs text-slate-600 font-bold block mb-1">Reason for Leave *</label>
+              <input type="text" required placeholder="e.g. Family function / Medical rest" value={newLeave.reason} onChange={(e) => setNewLeave({ ...newLeave, reason: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none" />
+            </div>
           </div>
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <button type="button" onClick={() => setShowApplyModal(false)} className="px-4 py-2 text-xs text-slate-500 font-semibold cursor-pointer">Cancel</button>
@@ -142,20 +146,16 @@ export default function LeavePanel({ user, triggerError }) {
         </form>
       )}
 
-      {leaves.length === 0 ? (
+      {loading ? (
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center text-xs text-slate-400">Loading leave records...</div>
+      ) : leaves.length === 0 ? (
         <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center space-y-3">
           <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center mx-auto text-2xl">
             <Icon icon="mdi:calendar-multiselect" />
           </div>
           <h3 className="text-sm font-bold text-slate-800">No Leave Applications Found</h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">There are no leave requests submitted for review. Click below to apply for employee leave.</p>
-          <button
-            onClick={() => {
-              setNewLeave({ empId: 'EMP-103', empName: '', department: 'Plant Operations', leaveType: 'Casual Leave', startDate: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0], daysCount: 1, reason: '' });
-              setShowApplyModal(true);
-            }}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-2 cursor-pointer shadow-sm"
-          >
+          <button onClick={() => { setNewLeave(EMPTY_LEAVE); setShowApplyModal(true); }} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-2 cursor-pointer shadow-sm">
             <Icon icon="mdi:plus" className="text-base" /> Apply First Leave
           </button>
         </div>
@@ -185,9 +185,7 @@ export default function LeavePanel({ user, triggerError }) {
                     <td className="p-4 font-mono text-slate-700">{l.startDate} to {l.endDate}</td>
                     <td className="p-4 text-slate-600">{l.reason}</td>
                     <td className="p-4">
-                      <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
-                        l.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : l.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
-                      }`}>
+                      <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${l.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : l.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'}`}>
                         {l.status}
                       </span>
                     </td>
@@ -195,18 +193,8 @@ export default function LeavePanel({ user, triggerError }) {
                       <div className="flex items-center justify-end gap-2">
                         {l.status === 'Pending' ? (
                           <>
-                            <button
-                              onClick={() => handleUpdateStatus(l._id, 'Approved')}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] px-2.5 py-1 rounded-lg font-bold cursor-pointer"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleUpdateStatus(l._id, 'Rejected')}
-                              className="bg-rose-600 hover:bg-rose-700 text-white text-[11px] px-2.5 py-1 rounded-lg font-bold cursor-pointer"
-                            >
-                              Reject
-                            </button>
+                            <button onClick={() => handleUpdateStatus(l._id, 'Approved')} className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] px-2.5 py-1 rounded-lg font-bold cursor-pointer">Approve</button>
+                            <button onClick={() => handleUpdateStatus(l._id, 'Rejected')} className="bg-rose-600 hover:bg-rose-700 text-white text-[11px] px-2.5 py-1 rounded-lg font-bold cursor-pointer">Reject</button>
                           </>
                         ) : (
                           <span className="text-[11px] text-slate-400 font-semibold">{l.approvedBy}</span>

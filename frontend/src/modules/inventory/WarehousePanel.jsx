@@ -5,7 +5,7 @@ import { api } from '../../lib/api';
 
 export default function WarehousePanel({ user, triggerError }) {
   const [warehouses, setWarehouses] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingWh, setEditingWh] = useState(null);
   const [formData, setFormData] = useState({
@@ -25,38 +25,57 @@ export default function WarehousePanel({ user, triggerError }) {
   }, []);
 
   const fetchWarehouses = async () => {
-    // Warehouse data is managed locally (no dedicated warehouse backend endpoint).
-    // Set to empty array on mount — user adds via modal.
-    setWarehouses([]);
-    setLoading(false);
+    setLoading(true);
+    try {
+      const res = await api.get('/inventory/warehouses');
+      setWarehouses(res?.data || []);
+    } catch (err) {
+      console.warn('Warehouse fetch failed:', err);
+      setWarehouses([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
 
-  const handleCreateWh = (e) => {
+  const handleCreateWh = async (e) => {
     e.preventDefault();
-    const created = {
-      _id: Date.now().toString(),
-      whCode: formData.whCode || `WH-0${warehouses.length + 1}`,
-      ...formData,
-    };
-    setWarehouses([created, ...warehouses]);
-    setShowAddModal(false);
-    setFormData({ whCode: '', whName: '', location: '', storageType: 'Cold Storage (Puree & Concentrate)', totalCapacity: '50,000 Kg', occupiedPct: 50, racksCount: 16, manager: 'Warehouse Manager', status: 'Optimal' });
-    if (triggerError) triggerError('Warehouse vault added successfully!', 'success');
+    try {
+      const res = await api.post('/inventory/warehouses', {
+        ...formData,
+        whCode: formData.whCode || `WH-${String(warehouses.length + 1).padStart(2, '0')}`,
+      });
+      setWarehouses([res.data, ...warehouses]);
+      setShowAddModal(false);
+      setFormData({ whCode: '', whName: '', location: '', storageType: 'Cold Storage (Puree & Concentrate)', totalCapacity: '50,000 Kg', occupiedPct: 50, racksCount: 16, manager: 'Warehouse Manager', status: 'Optimal' });
+      if (triggerError) triggerError('Warehouse vault added successfully!', 'success');
+    } catch (err) {
+      if (triggerError) triggerError(err?.message || 'Failed to create warehouse', 'error');
+    }
   };
 
-  const handleUpdateWh = (e) => {
+  const handleUpdateWh = async (e) => {
     e.preventDefault();
     if (!editingWh) return;
-    setWarehouses(warehouses.map(w => (w._id === editingWh._id ? { ...w, ...formData } : w)));
-    setEditingWh(null);
-    if (triggerError) triggerError('Warehouse details updated!', 'success');
+    try {
+      const res = await api.put(`/inventory/warehouses/${editingWh._id}`, formData);
+      setWarehouses(warehouses.map(w => w._id === editingWh._id ? res.data : w));
+      setEditingWh(null);
+      if (triggerError) triggerError('Warehouse details updated!', 'success');
+    } catch (err) {
+      if (triggerError) triggerError(err?.message || 'Failed to update warehouse', 'error');
+    }
   };
 
-  const handleDeleteWh = (id) => {
+  const handleDeleteWh = async (id) => {
     if (!window.confirm('Delete this warehouse entry?')) return;
-    setWarehouses(warehouses.filter(w => w._id !== id));
-    if (triggerError) triggerError('Warehouse removed!', 'success');
+    try {
+      await api.delete(`/inventory/warehouses/${id}`);
+      setWarehouses(warehouses.filter(w => w._id !== id));
+      if (triggerError) triggerError('Warehouse removed!', 'success');
+    } catch (err) {
+      if (triggerError) triggerError(err?.message || 'Failed to delete warehouse', 'error');
+    }
   };
 
   const openEditModal = (w) => {
@@ -210,7 +229,9 @@ export default function WarehousePanel({ user, triggerError }) {
         </form>
       )}
 
-      {warehouses.length === 0 ? (
+      {loading ? (
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center text-xs text-slate-400">Loading warehouses...</div>
+      ) : warehouses.length === 0 ? (
         <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center space-y-3">
           <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center mx-auto text-2xl">
             <Icon icon="mdi:warehouse" />

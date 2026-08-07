@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import ExportDataToolbar from '../../components/ExportDataToolbar';
+import logo from '../../assets/hero.png';
 import { api } from '../../lib/api';
+import { useNavigate } from 'react-router-dom';
+import BackButton from '../../components/BackButton';
+import useMountAnimation from '../../lib/useMountAnimation';
 
 export default function DepartmentPanel({ user, triggerError }) {
   const [departments, setDepartments] = useState([]);
+  const mountCls = useMountAnimation();
 
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -22,6 +27,8 @@ export default function DepartmentPanel({ user, triggerError }) {
   useEffect(() => {
     fetchDepartments();
   }, []);
+
+  const navigate = useNavigate();
 
   const fetchDepartments = async () => {
     try {
@@ -104,7 +111,7 @@ export default function DepartmentPanel({ user, triggerError }) {
   };
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className={`space-y-6 font-sans transition duration-300 ease-out ${mountCls}`}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -113,8 +120,57 @@ export default function DepartmentPanel({ user, triggerError }) {
           <p className="text-xs text-slate-400">Department structures, financial cost center allocation, HOD assignments, and personnel counts</p>
         </div>
 
+        <div className="w-full sm:w-auto mt-3 sm:mt-0 flex items-center gap-3">
+          <BackButton to="/settings" label="Back" />
+          <span className="text-xs text-slate-400">Settings / Departments</span>
+        </div>
+
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          <ExportDataToolbar data={departments} filename="departments_cost_centers" title="Department Cost Center Setup" />
+          <ExportDataToolbar
+            data={departments.map(d => ({
+              deptCode: d.deptCode || d.code || '',
+              name: d.name || '',
+              costCenter: d.costCenter || '',
+              headName: d.headName || '',
+              staffCount: d.staffCount || 0,
+              budget: d.budget || 0,
+              status: d.status || 'Active',
+            }))}
+            filename="departments_cost_centers"
+            title="Department Cost Center Setup"
+          />
+          <button
+            onClick={() => {
+              const printWindow = window.open('', '_blank');
+              if (!printWindow) { alert('Please allow popups to enable printing.'); return; }
+              const styles = `@page { size: A4 landscape; margin: 10mm; } body{font-family:Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;color:#0f172a;margin:15px;font-size:11px} .logo{height:40px;margin-bottom:8px} table{width:100%;border-collapse:collapse;margin-top:10px} th,td{border:1px solid #cbd5e1;padding:8px 10px;text-align:left;word-break:break-word} th{background:#ea580c;color:#fff;font-weight:bold} tr:nth-child(even) td { background:#f8fafc; }`;
+              const rows = departments.map(d => `
+                <tr>
+                  <td>${(d.deptCode||d.code||'').replace(/</g,'&lt;')}</td>
+                  <td>${(d.name||'').replace(/</g,'&lt;')}</td>
+                  <td>${(d.costCenter||'').replace(/</g,'&lt;')}</td>
+                  <td>${(d.headName||'').replace(/</g,'&lt;')}</td>
+                  <td>${d.staffCount||0}</td>
+                  <td>₹${(d.budget||0).toLocaleString()}</td>
+                  <td>${(d.status||'Active').replace(/</g,'&lt;')}</td>
+                </tr>`).join('');
+              const html = `
+                <html><head><title>Departments</title><style>${styles}</style></head>
+                <body>
+                  <img src="${logo}" class="logo" />
+                  <h1>Department Cost Center Setup</h1>
+                  <table>
+                    <thead><tr><th>Dept Code</th><th>Name</th><th>Cost Center</th><th>HOD</th><th>Staff</th><th>Budget</th><th>Status</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                  </table>
+                  <script>window.onload=function(){window.print();setTimeout(()=>window.close(),250)}</script>
+                </body></html>`;
+              printWindow.document.write(html); printWindow.document.close(); printWindow.focus();
+            }}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold flex items-center gap-2 transition"
+          >
+            <Icon icon="mdi:printer" className="text-base" /> Print
+          </button>
           <button
             onClick={() => {
               setFormData({ deptCode: `DEP-0${departments.length + 1}`, name: '', costCenter: `CC-${200 + departments.length * 100}`, headName: '', staffCount: 5, budget: 1500000, status: 'Active' });

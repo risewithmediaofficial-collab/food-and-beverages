@@ -49,9 +49,16 @@ export default function HrPanel({ triggerError }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [messageModalEmp, setMessageModalEmp] = useState(null);
+  const [editingEmp, setEditingEmp] = useState(null);
   const [newEmp, setNewEmp] = useState(emptyEmployee);
 
-  const roleOptions = roles.length ? roles : FALLBACK_ROLES;
+  const combinedRolesMap = new Map();
+  FALLBACK_ROLES.forEach((r) => combinedRolesMap.set(r.roleName, r));
+  roles.forEach((r) => {
+    const name = r.roleName || r.name;
+    if (name) combinedRolesMap.set(name, { ...r, roleName: name });
+  });
+  const roleOptions = Array.from(combinedRolesMap.values());
 
   useEffect(() => {
     loadEmployees();
@@ -79,6 +86,74 @@ export default function HrPanel({ triggerError }) {
       }
     } catch (err) {
       console.warn('Failed to load roles:', err);
+    }
+  };
+
+  const handleOpenEditModal = (emp) => {
+    setEditingEmp(emp);
+    setNewEmp({
+      name: emp.name || '',
+      username: emp.username || emp.email || '',
+      password: '',
+      role: emp.designation || emp.role || 'Employee',
+      department: emp.department || DEPARTMENTS[0],
+      shift: emp.shift || SHIFTS[0],
+      phone: emp.phone || '',
+      basicSalary: String(emp.basicSalary || 25000),
+      rfidCardNo: emp.rfidCardNo || '',
+      status: emp.status || 'Active',
+    });
+    setShowNewPassword(false);
+    setShowAddModal(true);
+  };
+
+  const handleOpenAddModal = () => {
+    setEditingEmp(null);
+    setNewEmp(emptyEmployee);
+    setShowNewPassword(false);
+    setShowAddModal(true);
+  };
+
+  const handleSaveEmployee = async (e) => {
+    e.preventDefault();
+    if (editingEmp) {
+      const name = newEmp.name.trim();
+      const generatedUsername = newEmp.username.trim() || `${name.toLowerCase().replace(/\s+/g, '')}@juice-erp.com`;
+      const payload = {
+        name,
+        username: generatedUsername,
+        email: generatedUsername,
+        designation: newEmp.role,
+        department: newEmp.department,
+        shift: newEmp.shift,
+        phone: newEmp.phone,
+        basicSalary: Number(newEmp.basicSalary || 25000),
+        rfidCardNo: newEmp.rfidCardNo,
+        status: newEmp.status,
+      };
+      if (newEmp.password && newEmp.password.trim()) {
+        payload.password = newEmp.password.trim();
+      }
+
+      try {
+        setLoading(true);
+        const res = await api.put(`/hr/employees/${editingEmp._id || editingEmp.id}`, payload);
+        if (res.success && res.data) {
+          setEmployees(employees.map((emp) => (emp._id === editingEmp._id || emp.id === editingEmp.id ? res.data : emp)));
+          if (triggerError) triggerError('Employee updated successfully!', 'success');
+        } else {
+          await loadEmployees();
+        }
+        setShowAddModal(false);
+        setEditingEmp(null);
+        setNewEmp(emptyEmployee);
+      } catch (err) {
+        if (triggerError) triggerError(err.message || 'Failed to update employee');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      await handleAddEmployee(e);
     }
   };
 
@@ -175,17 +250,18 @@ export default function HrPanel({ triggerError }) {
           {employees.length > 0 && (
             <button
               onClick={handleClearAllEmployees}
-              className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer h-9 shadow-xs"
+              title="Clear all employee records"
             >
               <Icon icon="mdi:trash-can-outline" className="text-sm" /> Clear All
             </button>
           )}
           <ExportDataToolbar data={employees} filename="employees_master" />
           <button
-            onClick={() => { setNewEmp(emptyEmployee); setShowNewPassword(false); setShowAddModal(true); }}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+            onClick={handleOpenAddModal}
+            className="bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white rounded-xl px-3.5 py-1.5 text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer whitespace-nowrap shrink-0 h-9"
           >
-            <Icon icon="mdi:plus" className="text-base" /> Add New Employee
+            <Icon icon="mdi:plus" className="text-sm" /> Add New Employee
           </button>
         </div>
       </div>
@@ -201,7 +277,7 @@ export default function HrPanel({ triggerError }) {
               The employee directory is currently empty. Add employees manually and assign the correct ERP role.
             </p>
             <button
-              onClick={() => { setNewEmp(emptyEmployee); setShowNewPassword(false); setShowAddModal(true); }}
+              onClick={handleOpenAddModal}
               className="mt-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition cursor-pointer"
             >
               + Add First Employee
@@ -241,18 +317,25 @@ export default function HrPanel({ triggerError }) {
                       <td className="p-4 text-slate-500">{emp.department || 'Operations'}</td>
                       <td className="p-4 font-mono text-orange-600 font-medium">{username}</td>
                       <td className="p-4">
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${emp.status === 'Inactive' ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
                           {emp.status || 'Active'}
                         </span>
                       </td>
                       <td className="p-4 text-right">
-                        <div className="flex gap-1.5 justify-end">
+                        <div className="flex gap-1.5 justify-end items-center">
                           <button
-                            onClick={() => setMessageModalEmp(emp)}
+                            onClick={() => copyLoginMessage(emp)}
                             className="px-2.5 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
                             title="Copy Login Message"
                           >
                             <Icon icon="mdi:send-outline" className="text-xs" /> Login Msg
+                          </button>
+                          <button
+                            onClick={() => handleOpenEditModal(emp)}
+                            className="p-1.5 hover:bg-slate-100 text-slate-600 rounded-lg transition cursor-pointer"
+                            title="Edit Employee Profile & Access"
+                          >
+                            <Icon icon="mdi:pencil-outline" className="text-sm" />
                           </button>
                           <button
                             onClick={() => handleDeleteEmployee(emp._id || emp.id)}
@@ -277,15 +360,17 @@ export default function HrPanel({ triggerError }) {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center p-5 border-b border-slate-100">
               <div>
-                <h3 className="text-sm font-extrabold text-slate-900">Add New Employee Profile</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">Assign a role/designation and create the login account</p>
+                <h3 className="text-sm font-extrabold text-slate-900">
+                  {editingEmp ? `Edit Employee Profile (${editingEmp.empId || 'EMP'})` : 'Add New Employee Profile'}
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">Assign a role/designation and manage ERP login access</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-slate-100 rounded-xl transition cursor-pointer">
                 <Icon icon="mdi:close" className="text-base text-slate-500" />
               </button>
             </div>
 
-            <form onSubmit={handleAddEmployee} className="p-5 space-y-4">
+            <form onSubmit={handleSaveEmployee} className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Full Name *</label>
@@ -360,12 +445,14 @@ export default function HrPanel({ triggerError }) {
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">Initial Password *</label>
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                      {editingEmp ? 'Password (Optional)' : 'Initial Password *'}
+                    </label>
                     <div className="relative">
                       <input
                         type={showNewPassword ? 'text' : 'password'}
-                        required
-                        placeholder="Set initial password"
+                        required={!editingEmp}
+                        placeholder={editingEmp ? 'Leave blank to keep current' : 'Set initial password'}
                         value={newEmp.password}
                         onChange={(e) => setNewEmp({ ...newEmp, password: e.target.value })}
                         className="w-full border border-slate-200 bg-white rounded-xl px-3 py-2 pr-10 text-xs focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 font-mono"
@@ -384,7 +471,7 @@ export default function HrPanel({ triggerError }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Phone Number</label>
                   <input
@@ -405,6 +492,17 @@ export default function HrPanel({ triggerError }) {
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
                   />
                 </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Account Status</label>
+                  <select
+                    value={newEmp.status}
+                    onChange={(e) => setNewEmp({ ...newEmp, status: e.target.value })}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -420,7 +518,7 @@ export default function HrPanel({ triggerError }) {
                   disabled={loading}
                   className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold py-2.5 rounded-xl transition disabled:opacity-50 cursor-pointer"
                 >
-                  {loading ? 'Creating...' : 'Save & Create Login Account'}
+                  {loading ? (editingEmp ? 'Saving...' : 'Creating...') : editingEmp ? 'Save Changes' : 'Save & Create Login Account'}
                 </button>
               </div>
             </form>

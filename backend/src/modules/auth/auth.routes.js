@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config/env.js';
 import { User, Role } from './auth.model.js';
+import { Organization } from '../superadmin/superadmin.model.js';
+import { canTenantLogin } from '../superadmin/superadmin.helpers.js';
 
 const router = express.Router();
 
@@ -43,13 +45,28 @@ const parsePermissions = (permissions) => {
   return [];
 };
 
-export const resolveRoleAccess = async (roleName) => {
+export const resolveRoleAccess = async (roleName, orgId = null) => {
   const fallbackName = roleName || 'Employee';
-  let role = await Role.findOne({
-    $or: [{ roleName: fallbackName }, { name: fallbackName }],
-    status: 'Active',
-  });
+  // Prefer org-specific role when orgId provided
+  let role = null;
+  if (orgId) {
+    role = await Role.findOne({
+      $or: [{ roleName: fallbackName }, { name: fallbackName }],
+      status: 'Active',
+      orgId,
+    });
+  }
 
+  // Fallback to global role
+  if (!role) {
+    role = await Role.findOne({
+      $or: [{ roleName: fallbackName }, { name: fallbackName }],
+      status: 'Active',
+      $or: [{ orgId: { $exists: false } }, { orgId: null }],
+    });
+  }
+
+  // If still not found, use default presets (global)
   if (!role) {
     const preset = DEFAULT_ROLES.find(r => r.roleName === fallbackName || r.name === fallbackName);
     role = preset ? await Role.create(preset) : null;
@@ -65,37 +82,9 @@ export const resolveRoleAccess = async (roleName) => {
 };
 
 export const ensureDefaultUsers = async () => {
-  try {
-    const passwordHash = await bcrypt.hash('password123', 10);
-    for (const preset of DEPARTMENT_PRESETS) {
-      const exists = await User.findOne({ email: preset.email });
-      if (!exists) {
-        await User.create({
-          email: preset.email,
-          passwordHash,
-          name: preset.name,
-          department: preset.dept,
-          roleName: preset.roleName,
-          role: preset.roleName,
-          empId: preset.empId,
-          plant: preset.plant,
-          status: 'Active',
-          isActive: true,
-        });
-      }
-    }
-
-    for (const r of DEFAULT_ROLES) {
-      await Role.findOneAndUpdate(
-        { name: r.name },
-        { $setOnInsert: r },
-        { upsert: true, new: true },
-      );
-    }
-    console.log('[Auth] Default department user accounts & roles initialized.');
-  } catch (err) {
-    console.warn('[Auth Warning] Unable to initialize default users/roles:', err.message);
-  }
+  // Auto-seeding of default users/roles disabled. Manual creation is required by Org Admins.
+  // This function is retained as a placeholder but will not modify the database.
+  console.log('[Auth] ensureDefaultUsers() called — auto-seeding is disabled. No changes made.');
 };
 
 router.post('/login', async (req, res) => {
@@ -116,11 +105,30 @@ router.post('/login', async (req, res) => {
       }
     }
 
-    const roleAccess = await resolveRoleAccess(user.roleName || user.role);
+    const roleAccess = await resolveRoleAccess(user.roleName || user.role, user.orgId);
+    let orgAllowedModules = null;
+    let orgName = null;
+
+    if (user.orgId) {
+      const userOrg = await Organization.findById(user.orgId);
+      if (userOrg) {
+        orgAllowedModules = userOrg.allowedModules;
+        orgName = userOrg.name;
+        if (!canTenantLogin(userOrg, user)) {
+          return res.status(403).json({ success: false, message: 'This organization account is suspended or inactive. Please contact the super admin.' });
+        }
+      }
+    }
+
     const payload = {
       id: user._id.toString(),
       name: user.name,
       email: user.email,
+      orgId: user.orgId ? user.orgId.toString() : null,
+      orgName: orgName || user.plant || 'Organization',
+      orgAllowedModules,
+      isSuperAdmin: Boolean(user.isSuperAdmin),
+      isOrgAdmin: Boolean(user.isOrgAdmin),
       roleName: roleAccess.roleName,
       department: user.department || 'Executive',
       factoryId: user.factoryId,
@@ -149,6 +157,7 @@ router.post('/register', async (req, res) => {
       return res.status(409).json({ success: false, message: 'Account already exists.' });
     }
 
+    // Public self-register uses global Employee role
     const roleAccess = await resolveRoleAccess('Employee');
     const passwordHash = await bcrypt.hash(password, 10);
     const count = await User.countDocuments();
@@ -185,11 +194,13 @@ router.get('/me', (req, res) => {
 // Users Management APIs
 router.get('/users', async (req, res) => {
   try {
-    let users = await User.find({}).select('-passwordHash').sort({ createdAt: -1 });
-    if (!users || users.length === 0) {
-      await ensureDefaultUsers();
-      users = await User.find({}).select('-passwordHash').sort({ createdAt: -1 });
+    const query = {};
+    // If requester is in an org and not super admin, show users for that org only
+    if (req.user && req.user.orgId && !req.user.isSuperAdmin) {
+      query.orgId = req.user.orgId;
+      query.isSuperAdmin = { $ne: true };
     }
+    const users = await User.find(query).select('-passwordHash').sort({ createdAt: -1 });
     res.json({ success: true, data: users });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -205,7 +216,12 @@ router.post('/users', async (req, res) => {
     if (!password) {
       return res.status(400).json({ success: false, message: 'Password is required for new user accounts.' });
     }
-    const roleAccess = await resolveRoleAccess(role);
+    // Only org admins or superadmins may create users via this endpoint
+    if (!req.user || !(req.user.isOrgAdmin || req.user.isSuperAdmin)) {
+      return res.status(403).json({ success: false, message: 'Insufficient permissions to create users.' });
+    }
+    const orgId = req.user?.orgId || null;
+    const roleAccess = await resolveRoleAccess(role, orgId);
     const passwordHash = await bcrypt.hash(password, 10);
     const count = await User.countDocuments();
     const newUser = await User.create({
@@ -217,6 +233,7 @@ router.post('/users', async (req, res) => {
       roleName: roleAccess.roleName,
       role: roleAccess.roleName,
       permissions: roleAccess.permissions,
+      orgId,
       department: department || 'Executive',
       plant: plant || 'Nashik Facility #1',
       status: 'Active',
@@ -230,6 +247,56 @@ router.post('/users', async (req, res) => {
   }
 });
 
+router.post('/password/change', async (req, res) => {
+  try {
+    const { email, oldPassword, newPassword } = req.body;
+    if (!email || !oldPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Email, old password, and new password are required.' });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail, isActive: true });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User account not found or inactive.' });
+    }
+
+    const isMatch = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Incorrect current password.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    user.passwordHash = passwordHash;
+    await user.save();
+
+    res.json({ success: true, message: 'Password updated successfully.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.post('/password/request-reset', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required.' });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail, isActive: true });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No active account was found for that email.' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Password reset requested. Please contact your administrator to approve a new password.',
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.put('/users/:id', async (req, res) => {
   try {
     const updates = { ...req.body };
@@ -237,7 +304,7 @@ router.put('/users/:id', async (req, res) => {
     delete updates.passwordHash;
 
     if (updates.role || updates.roleName) {
-      const roleAccess = await resolveRoleAccess(updates.role || updates.roleName);
+      const roleAccess = await resolveRoleAccess(updates.role || updates.roleName, req.user?.orgId || null);
       updates.roleId = roleAccess.roleId;
       updates.roleName = roleAccess.roleName;
       updates.role = roleAccess.roleName;
@@ -263,11 +330,11 @@ router.delete('/users/:id', async (req, res) => {
 // Roles Management APIs
 router.get('/roles', async (req, res) => {
   try {
-    let roles = await Role.find({}).sort({ createdAt: -1 });
-    if (!roles || roles.length === 0) {
-      await ensureDefaultUsers();
-      roles = await Role.find({}).sort({ createdAt: -1 });
+    const query = {};
+    if (req.user && req.user.orgId) {
+      query.$or = [{ orgId: req.user.orgId }, { orgId: { $exists: false } }, { orgId: null }];
     }
+    const roles = await Role.find(query).sort({ createdAt: -1 });
     res.json({ success: true, data: roles });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -280,6 +347,10 @@ router.post('/roles', async (req, res) => {
     if (!roleName) {
       return res.status(400).json({ success: false, message: 'Role title is required.' });
     }
+    // Only org admins or superadmins may create roles
+    if (!req.user || !(req.user.isOrgAdmin || req.user.isSuperAdmin)) {
+      return res.status(403).json({ success: false, message: 'Insufficient permissions to create roles.' });
+    }
     const newRole = await Role.create({
       name: roleName,
       roleName,
@@ -287,6 +358,7 @@ router.post('/roles', async (req, res) => {
       permissions: withMandatoryPermissions(parsePermissions(permissions).length ? parsePermissions(permissions) : ['READ_ONLY']),
       activeUsers: 1,
       status: status || 'Active',
+      orgId: req.user?.orgId || null,
     });
     res.status(201).json({ success: true, data: newRole, message: 'Role created successfully' });
   } catch (err) {
@@ -300,6 +372,10 @@ router.put('/roles/:id', async (req, res) => {
     if (Object.prototype.hasOwnProperty.call(updates, 'permissions')) {
       updates.permissions = withMandatoryPermissions(parsePermissions(updates.permissions));
     }
+    // Only org admins or superadmins may update roles
+    if (!req.user || !(req.user.isOrgAdmin || req.user.isSuperAdmin)) {
+      return res.status(403).json({ success: false, message: 'Insufficient permissions to update roles.' });
+    }
     const updated = await Role.findByIdAndUpdate(req.params.id, updates, { new: true });
     res.json({ success: true, data: updated, message: 'Role updated successfully' });
   } catch (err) {
@@ -309,6 +385,9 @@ router.put('/roles/:id', async (req, res) => {
 
 router.delete('/roles/:id', async (req, res) => {
   try {
+    if (!req.user || !(req.user.isOrgAdmin || req.user.isSuperAdmin)) {
+      return res.status(403).json({ success: false, message: 'Insufficient permissions to delete roles.' });
+    }
     await Role.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Role deleted successfully' });
   } catch (err) {

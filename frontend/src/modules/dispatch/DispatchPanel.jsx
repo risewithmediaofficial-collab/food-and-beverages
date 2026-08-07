@@ -5,6 +5,8 @@ import { api } from '../../lib/api';
 
 export default function DispatchPanel({ user, triggerError }) {
   const [dispatches, setDispatches] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingDsp, setEditingDsp] = useState(null);
@@ -26,17 +28,36 @@ export default function DispatchPanel({ user, triggerError }) {
   const fetchDispatches = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/dispatch/records');
+      const [res, orderRes] = await Promise.all([
+        api.get('/dispatch/records'),
+        api.get('/production/orders'),
+      ]);
       if (res.success && Array.isArray(res.data)) {
         setDispatches(res.data);
       } else {
         setDispatches([]);
+      }
+      if (orderRes.success && Array.isArray(orderRes.data)) {
+        setOrders(orderRes.data);
       }
     } catch (err) {
       console.warn('Failed to load dispatch orders:', err);
       setDispatches([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSelectOrder = (orderId) => {
+    setSelectedOrderId(orderId);
+    if (!orderId) return;
+    const ord = orders.find((o) => o._id === orderId || o.orderNo === orderId);
+    if (ord) {
+      setFormData({
+        ...formData,
+        orderNo: ord.orderNo || `PO-${ord._id.slice(-5)}`,
+        qtyLoaded: `${(ord.qtyProduced || ord.qtyPlanned || 5000).toLocaleString()} ${ord.unit || 'Bottles'} (${ord.productName})`,
+      });
     }
   };
 
@@ -58,12 +79,12 @@ export default function DispatchPanel({ user, triggerError }) {
       const res = await api.post('/dispatch/records', payload);
       if (res.success && res.data) {
         setDispatches([res.data, ...dispatches]);
+        setShowAddModal(false);
+        setFormData({ id: '', vehicleNo: '', driverName: '', destination: '', orderNo: '', qtyLoaded: '', status: 'In Transit', gpsLocation: '' });
+        if (triggerError) triggerError('Dispatch delivery order created!', 'success');
       } else {
-        setDispatches([{ _id: Date.now().toString(), ...payload }, ...dispatches]);
+        throw new Error(res.message || 'Failed to create dispatch order');
       }
-      setShowAddModal(false);
-      setFormData({ id: '', vehicleNo: '', driverName: '', destination: '', orderNo: '', qtyLoaded: '', status: 'In Transit', gpsLocation: '' });
-      if (triggerError) triggerError('Dispatch delivery order created!', 'success');
     } catch (err) {
       if (triggerError) triggerError(err.message || 'Failed to create dispatch order');
     } finally {
@@ -152,6 +173,31 @@ export default function DispatchPanel({ user, triggerError }) {
             </h3>
             <button type="button" onClick={() => { setShowAddModal(false); setEditingDsp(null); }} className="text-slate-400 hover:text-slate-600 text-sm">✕</button>
           </div>
+
+          {!editingDsp && (
+            <div className="bg-orange-50/60 border border-orange-100 p-3 rounded-xl">
+              <label className="text-xs font-bold text-orange-900 block mb-1">
+                Select Production Order for Dispatch (Auto-fill)
+              </label>
+              <select
+                value={selectedOrderId}
+                onChange={(e) => handleSelectOrder(e.target.value)}
+                className="w-full bg-white border border-orange-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-orange-200"
+              >
+                <option value="">-- Manual Entry (Or select a Production Order below) --</option>
+                {orders.map((o) => (
+                  <option key={o._id} value={o._id}>
+                    [{o.orderNo || 'PO'}] Batch {o.batchId} - {o.productName} ({o.qtyProduced || o.qtyPlanned} {o.unit || 'Units'})
+                  </option>
+                ))}
+              </select>
+              {selectedOrderId && (
+                <span className="text-[10px] text-orange-700 block mt-1 font-semibold">
+                  ✓ Auto-filled order ref & loaded quantity from Production Order {selectedOrderId}
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>

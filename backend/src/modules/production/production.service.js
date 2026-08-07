@@ -7,37 +7,51 @@ import { getIO } from '../../config/socket.js';
 import { QCCheck } from '../quality/quality.model.js';
 
 export const productionService = {
-  async createProductionOrder({ factoryId, productId, recipeId, qtyPlanned, salesOrderId, shiftId, supervisorId, productCode = 'JUICE' }) {
+  async createProductionOrder({ factoryId, productId, recipeId, qtyPlanned, productName = 'Juice Bottle (500ml)', unit = 'Bottles', batchId: customBatchId, salesOrderId, shiftId = 'Morning', supervisorId, productCode = 'JUICE' }) {
     const sequence = (await ProductionOrder.countDocuments()) + 1;
-    const batchId = generateBatchId('F1', productCode, new Date(), sequence);
+    const batchId = customBatchId || generateBatchId('F1', productCode, new Date(), sequence);
     const orderNo = `PO-${Date.now().toString().slice(-6)}`;
 
-    const bom = await recipeService.calculateRequirement(recipeId, qtyPlanned);
+    let bom = { requirements: [] };
+    try {
+      if (recipeId) {
+        bom = await recipeService.calculateRequirement(recipeId, qtyPlanned);
+      }
+    } catch (e) {
+      console.warn('[ProductionService Warning] Recipe calculation bypassed:', e.message);
+    }
 
+    const materialCost = (bom.requirements?.length || 2) * 1500;
     const order = new ProductionOrder({
       factoryId,
       orderNo,
       batchId,
+      productName,
+      unit,
       salesOrderId,
       productId,
       recipeId,
-      qtyPlanned,
+      qtyPlanned: Number(qtyPlanned || 1000),
       shiftId,
       supervisorId,
       status: 'planning',
       costBreakdown: {
-        materialCost: bom.requirements.length * 1500,
+        materialCost,
         machineCost: 500,
         laborCost: 800,
-        totalCost: (bom.requirements.length * 1500) + 1300,
+        totalCost: materialCost + 1300,
       },
     });
 
     await order.save();
-    eventBus.emit(EVENTS.PRODUCTION_ORDER_CREATED, { orderId: order._id, batchId, qtyPlanned });
-    getIO().emit('production:order-updated', { orderId: order._id, status: order.status, batchId });
+    try {
+      eventBus.emit(EVENTS.PRODUCTION_ORDER_CREATED, { orderId: order._id, batchId, qtyPlanned });
+      getIO().emit('production:order-updated', { orderId: order._id, status: order.status, batchId });
+    } catch (e) {
+      console.warn('[ProductionService Socket Warning] Could not broadcast event:', e.message);
+    }
 
-    return { order, bom };
+    return order;
   },
 
   async startProductionOrder(orderId, userId) {

@@ -60,12 +60,12 @@ export default function ProductionPlanningPanel({ user, triggerError }) {
       const res = await api.post('/production/plans', payload);
       if (res.success && res.data) {
         setPlans([res.data, ...plans]);
+        setShowAddModal(false);
+        setFormData({ planCode: '', productName: '', targetQty: 25000, unit: 'Bottles', shift: 'Morning + Evening', targetDate: new Date().toISOString().split('T')[0], capacityPct: 85, status: 'Approved' });
+        if (triggerError) triggerError('Production schedule plan created!', 'success');
       } else {
-        setPlans([{ _id: Date.now().toString(), ...payload }, ...plans]);
+        throw new Error(res.message || 'Failed to create plan');
       }
-      setShowAddModal(false);
-      setFormData({ planCode: '', productName: '', targetQty: 25000, unit: 'Bottles', shift: 'Morning + Evening', targetDate: new Date().toISOString().split('T')[0], capacityPct: 85, status: 'Approved' });
-      if (triggerError) triggerError('Production schedule plan created!', 'success');
     } catch (err) {
       if (triggerError) triggerError(err.message || 'Failed to create plan');
     } finally {
