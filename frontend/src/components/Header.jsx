@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { socket } from '../lib/socket';
 import { Icon } from '@iconify/react';
-import { MODULE_MAP } from '../moduleRoutes';
+import { useNavigate } from 'react-router-dom';
+import { MODULE_GROUPS, MODULE_MAP } from '../moduleRoutes';
+import { canAccessModule } from '../accessControl';
 
 export default function Header({ activeModule, user, onMenuToggle, isCollapsed }) {
+  const navigate = useNavigate();
   const [isLive, setIsLive] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [notifications, setNotifications] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -49,6 +52,16 @@ export default function Header({ activeModule, user, onMenuToggle, isCollapsed }
   const moduleLabel = moduleInfo?.label || 'Executive Dashboard';
   const moduleIcon = moduleInfo?.icon || 'mdi:view-dashboard-outline';
   const plantName = user?.plant || 'Manufacturing Plant';
+  const currentGroup = MODULE_GROUPS.find((group) => group.items.includes(activeModule));
+  const firstGroupModule = currentGroup?.items.find((itemId) => canAccessModule(user, itemId));
+  const groupTarget = firstGroupModule ? MODULE_MAP[firstGroupModule]?.path : null;
+  const groupLabel = currentGroup?.title
+    ? currentGroup.title.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase())
+    : 'Workspace';
+
+  const goTo = (path) => {
+    if (path) navigate(path);
+  };
 
   return (
     <header className="bg-white border-b border-slate-200/80 px-4 md:px-6 py-3 flex justify-between items-center sticky top-0 z-20 font-sans shadow-sm shrink-0 gap-3">
@@ -64,14 +77,44 @@ export default function Header({ activeModule, user, onMenuToggle, isCollapsed }
 
 
         {/* Module info */}
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2">
             <Icon icon={moduleIcon} className="text-orange-500 text-base shrink-0" />
             <h2 className="text-sm font-extrabold text-slate-900 leading-tight truncate">
               {moduleLabel}
             </h2>
           </div>
-          <span className="text-[11px] text-slate-400 font-medium mt-0.5 truncate hidden sm:block">
+          <nav className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 min-w-0" aria-label="Breadcrumb">
+            <button
+              type="button"
+              onClick={() => goTo('/dashboard')}
+              className="hover:text-orange-600 transition cursor-pointer shrink-0"
+            >
+              Dashboard
+            </button>
+            <Icon icon="mdi:chevron-right" className="text-slate-300 text-sm shrink-0" />
+            {currentGroup && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => goTo(groupTarget)}
+                  className="hover:text-orange-600 transition cursor-pointer truncate max-w-[150px]"
+                  title={groupLabel}
+                >
+                  {groupLabel}
+                </button>
+                <Icon icon="mdi:chevron-right" className="text-slate-300 text-sm shrink-0" />
+              </>
+            )}
+            <span className="text-slate-600 truncate max-w-[180px]" title={moduleLabel}>
+              {moduleLabel}
+            </span>
+            <span className="hidden xl:inline text-slate-300 shrink-0">|</span>
+            <span className="hidden xl:inline truncate max-w-[220px]">
+              {plantName} · {user?.department || 'Executive'}
+            </span>
+          </nav>
+          <span className="hidden">
             {plantName} · {user?.department || 'Executive'}
           </span>
         </div>
