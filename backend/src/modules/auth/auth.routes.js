@@ -8,16 +8,20 @@ import { canTenantLogin } from '../superadmin/superadmin.helpers.js';
 
 const router = express.Router();
 
-export const DEPARTMENT_PRESETS = [
-  { email: 'admin@juice-erp.com', name: 'Vikram Sharma', dept: 'Executive', roleName: 'General Manager', empId: 'EMP-101', plant: 'Nashik Facility #1' },
-  { email: 'sales@juice-erp.com', name: 'Rohan Gupta', dept: 'Sales & CRM', roleName: 'Sales Lead', empId: 'EMP-102', plant: 'Nashik Facility #1' },
-  { email: 'production@juice-erp.com', name: 'Naveen Kumar', dept: 'Plant Operations', roleName: 'Plant Supervisor', empId: 'EMP-103', plant: 'Nashik Facility #1' },
-  { email: 'operator@juice-erp.com', name: 'Sunil Rao', dept: 'Machine Operations', roleName: 'Line Operator', empId: 'EMP-104', plant: 'Nashik Facility #1' },
-  { email: 'quality@juice-erp.com', name: 'Meera Nair', dept: 'QC Lab', roleName: 'Quality Inspector', empId: 'EMP-105', plant: 'Nashik Facility #1' },
+export const DEPARTMENT_PRESETS = [];
+export const LEGACY_SEEDED_USER_EMAILS = [
+  'admin@juice-erp.com',
+  'sales@juice-erp.com',
+  'production@juice-erp.com',
+  'operator@juice-erp.com',
+  'quality@juice-erp.com',
+  'seedadmin@example.com',
+  'user1@example.com',
+  'user2@example.com',
 ];
 
 export const DEFAULT_ROLES = [
-  { name: 'General Manager', roleName: 'General Manager', accessLevel: 'Full System Superadmin', permissions: ['*', 'ALL_MODULES_FULL_ACCESS'], activeUsers: 1, status: 'Active' },
+  { name: 'General Manager', roleName: 'General Manager', accessLevel: 'Organization Manager', permissions: ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS'], activeUsers: 0, status: 'Active' },
   { name: 'Sales Lead', roleName: 'Sales Lead', accessLevel: 'Sales & CRM Portal', permissions: ['DASHBOARD', 'CRM', 'SALES', 'CUSTOMERS', 'LEADS', 'INVOICES', 'REPORTS'], activeUsers: 2, status: 'Active' },
   { name: 'Plant Supervisor', roleName: 'Plant Supervisor', accessLevel: 'Production & Planning Portal', permissions: ['DASHBOARD', 'PRODUCTION', 'BATCHES', 'RECIPES', 'PLANNING', 'MACHINE', 'QUALITY'], activeUsers: 3, status: 'Active' },
   { name: 'Line Operator', roleName: 'Line Operator', accessLevel: 'Machine Operations Portal', permissions: ['DASHBOARD', 'MACHINE', 'MACHINE_OPERATION', 'PRODUCTION'], activeUsers: 5, status: 'Active' },
@@ -62,7 +66,7 @@ export const resolveRoleAccess = async (roleName, orgId = null) => {
     role = await Role.findOne({
       $or: [{ roleName: fallbackName }, { name: fallbackName }],
       status: 'Active',
-      $or: [{ orgId: { $exists: false } }, { orgId: null }],
+      $and: [{ $or: [{ orgId: { $exists: false } }, { orgId: null }] }],
     });
   }
 
@@ -85,6 +89,17 @@ export const ensureDefaultUsers = async () => {
   // Auto-seeding of default users/roles disabled. Manual creation is required by Org Admins.
   // This function is retained as a placeholder but will not modify the database.
   console.log('[Auth] ensureDefaultUsers() called — auto-seeding is disabled. No changes made.');
+};
+
+export const cleanupLegacySeededUsers = async () => {
+  const result = await User.deleteMany({
+    isSuperAdmin: { $ne: true },
+    email: { $in: LEGACY_SEEDED_USER_EMAILS },
+  });
+
+  if (result.deletedCount) {
+    console.log(`[Auth] Removed ${result.deletedCount} legacy seeded user account(s).`);
+  }
 };
 
 router.post('/login', async (req, res) => {
@@ -145,43 +160,10 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/register', async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'Name, email and password are required.' });
-    }
-    const normalizedEmail = String(email).trim().toLowerCase();
-
-    const exists = await User.findOne({ email: normalizedEmail });
-    if (exists) {
-      return res.status(409).json({ success: false, message: 'Account already exists.' });
-    }
-
-    // Public self-register uses global Employee role
-    const roleAccess = await resolveRoleAccess('Employee');
-    const passwordHash = await bcrypt.hash(password, 10);
-    const count = await User.countDocuments();
-    const newUser = await User.create({
-      empId: `EMP-${101 + count}`,
-      name: String(name).trim(),
-      email: normalizedEmail,
-      passwordHash,
-      roleId: roleAccess.roleId,
-      roleName: roleAccess.roleName,
-      role: roleAccess.roleName,
-      permissions: roleAccess.permissions,
-      department: 'Employee Self Service',
-      plant: 'Nashik Facility #1',
-      status: 'Active',
-      isActive: true,
-    });
-
-    const safeUser = newUser.toObject();
-    delete safeUser.passwordHash;
-    res.status(201).json({ success: true, data: safeUser, message: 'Account created successfully' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+  return res.status(403).json({
+    success: false,
+    message: 'Self-registration is disabled. Accounts must be created by Super Admin.',
+  });
 });
 
 router.get('/me', (req, res) => {
@@ -194,14 +176,37 @@ router.get('/me', (req, res) => {
 // Users Management APIs
 router.get('/users', async (req, res) => {
   try {
-    const query = {};
-    // If requester is in an org and not super admin, show users for that org only
-    if (req.user && req.user.orgId && !req.user.isSuperAdmin) {
-      query.orgId = req.user.orgId;
-      query.isSuperAdmin = { $ne: true };
+    if (!req.user?.isSuperAdmin) {
+      return res.status(403).json({ success: false, message: 'Only Super Admin can view user accounts.' });
     }
+
+    const query = {
+      isSuperAdmin: { $ne: true },
+      isActive: true,
+      status: 'Active',
+      email: { $nin: LEGACY_SEEDED_USER_EMAILS },
+    };
+
+    if (req.orgId) query.orgId = req.orgId;
+
     const users = await User.find(query).select('-passwordHash').sort({ createdAt: -1 });
-    res.json({ success: true, data: users });
+    const scopeQuery = req.orgId
+      ? { orgId: req.orgId, isSuperAdmin: { $ne: true }, email: { $nin: LEGACY_SEEDED_USER_EMAILS } }
+      : { isSuperAdmin: { $ne: true }, email: { $nin: LEGACY_SEEDED_USER_EMAILS } };
+    const [totalUsers, liveUsers, inactiveUsers] = await Promise.all([
+      User.countDocuments(scopeQuery),
+      User.countDocuments({ ...scopeQuery, isActive: true, status: 'Active' }),
+      User.countDocuments({
+        ...scopeQuery,
+        $or: [{ isActive: false }, { status: { $ne: 'Active' } }],
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: users,
+      meta: { totalUsers, liveUsers, inactiveUsers },
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -216,11 +221,10 @@ router.post('/users', async (req, res) => {
     if (!password) {
       return res.status(400).json({ success: false, message: 'Password is required for new user accounts.' });
     }
-    // Only org admins or superadmins may create users via this endpoint
-    if (!req.user || !(req.user.isOrgAdmin || req.user.isSuperAdmin)) {
-      return res.status(403).json({ success: false, message: 'Insufficient permissions to create users.' });
+    if (!req.user?.isSuperAdmin) {
+      return res.status(403).json({ success: false, message: 'Only Super Admin can create user accounts.' });
     }
-    const orgId = req.user?.orgId || null;
+    const orgId = req.orgId || null;
     const roleAccess = await resolveRoleAccess(role, orgId);
     const passwordHash = await bcrypt.hash(password, 10);
     const count = await User.countDocuments();
@@ -299,6 +303,10 @@ router.post('/password/request-reset', async (req, res) => {
 
 router.put('/users/:id', async (req, res) => {
   try {
+    if (!req.user?.isSuperAdmin) {
+      return res.status(403).json({ success: false, message: 'Only Super Admin can update user accounts.' });
+    }
+
     const updates = { ...req.body };
     delete updates.password;
     delete updates.passwordHash;
@@ -320,6 +328,10 @@ router.put('/users/:id', async (req, res) => {
 
 router.delete('/users/:id', async (req, res) => {
   try {
+    if (!req.user?.isSuperAdmin) {
+      return res.status(403).json({ success: false, message: 'Only Super Admin can remove user accounts.' });
+    }
+
     await User.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'User removed successfully' });
   } catch (err) {

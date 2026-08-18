@@ -10,6 +10,7 @@ export default function UserManagementPanel({ user, triggerError }) {
   const mountCls = useMountAnimation();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [userStats, setUserStats] = useState({ totalUsers: 0, liveUsers: 0, inactiveUsers: 0 });
 
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -53,7 +54,7 @@ export default function UserManagementPanel({ user, triggerError }) {
     { roleName: 'Inventory Manager', accessLevel: 'Inventory & Warehouse Portal' },
     { roleName: 'Accounts Specialist', accessLevel: 'Finance & Billing Portal' },
     { roleName: 'HR Manager', accessLevel: 'HR & Employee Portal' },
-    { roleName: 'General Manager', accessLevel: 'Full System Superadmin' },
+    { roleName: 'General Manager', accessLevel: 'Organization Manager' },
   ];
 
   const combinedRolesMap = new Map();
@@ -70,12 +71,15 @@ export default function UserManagementPanel({ user, triggerError }) {
       const res = await api.get('/auth/users');
       if (res.success && Array.isArray(res.data)) {
         setUsers(res.data);
+        setUserStats(res.meta || { totalUsers: res.data.length, liveUsers: res.data.length, inactiveUsers: 0 });
       } else {
         setUsers([]);
+        setUserStats({ totalUsers: 0, liveUsers: 0, inactiveUsers: 0 });
       }
     } catch (err) {
       console.warn('Unable to load users from API:', err);
       setUsers([]);
+      setUserStats({ totalUsers: 0, liveUsers: 0, inactiveUsers: 0 });
     } finally {
       setLoading(false);
     }
@@ -161,9 +165,9 @@ export default function UserManagementPanel({ user, triggerError }) {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full xl:w-auto">
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Icon icon="mdi:account-group" className="text-orange-500 text-lg" /> System User Accounts & Access Directory
+              <Icon icon="mdi:account-group" className="text-orange-500 text-lg" /> Live User Accounts
             </h2>
-            <p className="text-xs text-slate-400">Manage user login accounts, department assignments, role permissions, and active sessions</p>
+            <p className="text-xs text-slate-400">Super Admin view of active organization login accounts and available user count</p>
           </div>
           <div className="w-full sm:w-auto mt-1 sm:mt-0 flex items-center gap-3 shrink-0">
             <BackButton to="/settings" label="Back" />
@@ -259,6 +263,21 @@ export default function UserManagementPanel({ user, triggerError }) {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Live Users</div>
+          <div className="mt-2 text-2xl font-extrabold text-emerald-600">{userStats.liveUsers}</div>
+        </div>
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Accounts</div>
+          <div className="mt-2 text-2xl font-extrabold text-slate-900">{userStats.totalUsers}</div>
+        </div>
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Inactive / Suspended</div>
+          <div className="mt-2 text-2xl font-extrabold text-amber-600">{userStats.inactiveUsers}</div>
+        </div>
+      </div>
+
       {(showAddModal || editingUser) && (
         <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser} className="bg-white border border-orange-200 p-5 rounded-2xl space-y-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -277,7 +296,7 @@ export default function UserManagementPanel({ user, triggerError }) {
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g. Vikram Sharma"
+                placeholder="e.g. Sathish Kumar"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
               />
             </div>

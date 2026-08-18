@@ -49,6 +49,7 @@ const MODULE_PERMISSION_MAP = {
 const ADMIN_ROLE_HINTS = ['admin', 'general manager', 'superadmin'];
 const ADMIN_PERMISSIONS = ['*', 'ALL', 'ALL_MODULES_FULL_ACCESS'];
 const ALWAYS_ALLOWED_MODULES = ['dashboard', 'rfid_attendance', 'org', 'settings', 'help'];
+const SUPER_ADMIN_ONLY_MODULES = ['users', 'roles'];
 
 export const getUserPermissions = (user) => {
   const rawPermissions = [
@@ -60,7 +61,7 @@ export const getUserPermissions = (user) => {
 };
 
 export const isAdminUser = (user) => {
-  if (user?.isSuperAdmin || user?.isOrgAdmin) return true;
+  if (user?.isSuperAdmin) return true;
   const roleName = String(user?.roleName || user?.role?.name || user?.role || '').toLowerCase();
   const permissions = getUserPermissions(user);
   return ADMIN_ROLE_HINTS.some((hint) => roleName.includes(hint)) ||
@@ -69,8 +70,17 @@ export const isAdminUser = (user) => {
 
 export const canAccessModule = (user, moduleId) => {
   if (!moduleId) return false;
-  if (isAdminUser(user)) return true;
+  if (SUPER_ADMIN_ONLY_MODULES.includes(moduleId)) return Boolean(user?.isSuperAdmin);
+  if (user?.isSuperAdmin) return true;
   if (ALWAYS_ALLOWED_MODULES.includes(moduleId)) return true;
+
+  if (user?.isOrgAdmin) {
+    return !Array.isArray(user?.orgAllowedModules) ||
+      user.orgAllowedModules.length === 0 ||
+      user.orgAllowedModules.includes(moduleId);
+  }
+
+  if (isAdminUser(user)) return true;
 
   // If organization has restricted modules enabled by Super Admin, enforce org-level module access for staff
   if (Array.isArray(user?.orgAllowedModules) && user.orgAllowedModules.length > 0) {

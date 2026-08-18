@@ -11,8 +11,10 @@ export const api = axios.create({
 
 // Request interceptor to attach JWT token and optional org context
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token') || 'local_token_dev';
-  config.headers.Authorization = `Bearer ${token}`;
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
 
   const inspectedOrgId = localStorage.getItem('inspected_org_id');
   if (inspectedOrgId) {

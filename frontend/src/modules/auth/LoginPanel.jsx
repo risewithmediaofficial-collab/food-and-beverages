@@ -188,20 +188,11 @@ export default function LoginPanel({ onLoginSuccess }) {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateAccount(true)}
-                  className="h-10 text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Icon icon="mdi:account-plus-outline" className="text-base text-slate-800" />
-                  <span>Register New User</span>
-                </button>
-
+              <div className="pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowPlanRequestModal(true)}
-                  className="h-10 text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full h-10 text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Icon icon="mdi:gift-outline" className="text-base" />
                   <span>Request Free Demo</span>

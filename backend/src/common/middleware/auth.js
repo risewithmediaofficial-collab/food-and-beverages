@@ -20,19 +20,8 @@ export const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
 
-  if (!token || token.startsWith('local_token_')) {
-    req.user = {
-      id: 'dev_admin_id',
-      name: 'Vikram Sharma',
-      email: 'admin@juice-erp.com',
-      roleName: 'General Manager',
-      department: 'Executive',
-      isSuperAdmin: false,
-      isOrgAdmin: true,
-      role: { name: 'General Manager', permissions: ['all', '*'] },
-    };
-    req.orgId = req.headers['x-org-id'] || null;
-    return next();
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'Authentication required.' });
   }
 
   try {
@@ -48,18 +37,7 @@ export const authenticate = (req, res, next) => {
     req.isOrgAdmin = Boolean(decoded.isOrgAdmin);
     next();
   } catch (err) {
-    req.user = {
-      id: 'dev_admin_id',
-      name: 'Vikram Sharma',
-      email: 'admin@juice-erp.com',
-      roleName: 'General Manager',
-      department: 'Executive',
-      isSuperAdmin: false,
-      isOrgAdmin: true,
-      role: { name: 'General Manager', permissions: ['all', '*'] },
-    };
-    req.orgId = req.headers['x-org-id'] || null;
-    next();
+    return res.status(401).json({ success: false, message: 'Invalid or expired session.' });
   }
 };
 

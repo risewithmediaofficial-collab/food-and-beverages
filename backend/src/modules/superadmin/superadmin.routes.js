@@ -151,7 +151,7 @@ router.post('/requests/:id/approve', async (req, res) => {
         plant: `${orgReq.companyName} Main Facility`,
         status: 'Active',
         isActive: true,
-        permissions: ['DASHBOARD', 'ATTENDANCE', 'ALL_MODULES_FULL_ACCESS'],
+        permissions: ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS', 'ATTENDANCE'],
       });
 
       // Update Org Admin reference
@@ -272,7 +272,7 @@ router.post('/orgs', async (req, res) => {
         planType: planType || 'Growth Plan',
         status: 'Active',
         maxUsers: maxUsers ? Number(maxUsers) : 25,
-        allowedModules: ['dashboard', 'crm', 'sales', 'purchase', 'inventory', 'production', 'quality', 'finance', 'reports', 'settings', 'users', 'roles', 'notifications'],
+        allowedModules: ['dashboard', 'crm', 'sales', 'purchase', 'inventory', 'production', 'quality', 'finance', 'reports', 'settings', 'notifications'],
       });
 
       const passwordHash = await bcrypt.hash(adminPassword, 10);
@@ -290,7 +290,7 @@ router.post('/orgs', async (req, res) => {
         plant: `${name} Main Facility`,
         status: 'Active',
         isActive: true,
-        permissions: ['DASHBOARD', 'ATTENDANCE', 'ALL_MODULES_FULL_ACCESS'],
+        permissions: ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS', 'ATTENDANCE'],
       });
 
       org.adminUserId = orgAdmin._id;
@@ -417,7 +417,7 @@ router.post('/orgs/:id/reset-password', async (req, res) => {
         plant: `${org.name} Main Facility`,
         status: 'Active',
         isActive: true,
-        permissions: ['DASHBOARD', 'ATTENDANCE', 'ALL_MODULES_FULL_ACCESS'],
+        permissions: ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS', 'ATTENDANCE'],
       });
     } else {
       adminUser.passwordHash = passwordHash;
