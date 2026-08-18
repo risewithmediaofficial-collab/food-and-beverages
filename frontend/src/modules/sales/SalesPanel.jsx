@@ -8,6 +8,7 @@ export default function SalesPanel({ user, triggerError }) {
   const [orders, setOrders] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [orgProfile, setOrgProfile] = useState(null);
+  const [activeTab, setActiveTab] = useState('orders');
   const [showAddOrder, setShowAddOrder] = useState(false);
   const [newOrder, setNewOrder] = useState({ customerName: '', qty: 0, rate: 0, gstRatePct: 18 });
   const [editingOrder, setEditingOrder] = useState(null);
@@ -353,6 +354,26 @@ export default function SalesPanel({ user, triggerError }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex bg-slate-100 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setActiveTab('orders')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                activeTab === 'orders' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Orders
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('invoices')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                activeTab === 'invoices' ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Invoices
+            </button>
+          </div>
           <ExportDataToolbar data={activeTab === 'orders' ? orders : invoices} filename={activeTab === 'orders' ? 'sales_orders_register' : 'issued_gst_invoices'} title={activeTab === 'orders' ? 'Sales Orders Register' : 'Issued GST Invoices'} />
           <button
             onClick={() => setShowAddOrder(true)}
@@ -498,6 +519,7 @@ export default function SalesPanel({ user, triggerError }) {
       ) : (
         <div className="space-y-6">
           {/* Orders Table */}
+          {activeTab === 'orders' && (
           <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
             <div className="p-4 bg-slate-50/70 border-b border-slate-200 flex justify-between items-center">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Active Customer Orders ({orders.length})</h3>
@@ -565,13 +587,17 @@ export default function SalesPanel({ user, triggerError }) {
               </div>
             )}
           </div>
+          )}
 
           {/* Invoices Table */}
-          {invoices.length > 0 && (
+          {activeTab === 'invoices' && (
             <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
               <div className="p-4 bg-slate-50/70 border-b border-slate-200">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Issued GST Invoices ({invoices.length})</h3>
               </div>
+              {invoices.length === 0 ? (
+                <div className="p-5 text-xs text-slate-500 text-center">No invoices issued yet. Generate an invoice from a sales order.</div>
+              ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-700 min-w-[600px]">
                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200">
@@ -632,6 +658,7 @@ export default function SalesPanel({ user, triggerError }) {
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
           )}
         </div>

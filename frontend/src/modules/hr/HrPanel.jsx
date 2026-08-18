@@ -226,11 +226,38 @@ export default function HrPanel({ triggerError }) {
     }
   };
 
-  const copyLoginMessage = (emp) => {
+  const copyTextToClipboard = async (text) => {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.setAttribute('readonly', '');
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-9999px';
+    document.body.appendChild(textArea);
+    textArea.select();
+
+    try {
+      return document.execCommand('copy');
+    } finally {
+      document.body.removeChild(textArea);
+    }
+  };
+
+  const copyLoginMessage = async (emp) => {
     const username = emp.username || emp.email || `${emp.name.toLowerCase().replace(/\s+/g, '')}@juice-erp.com`;
     const text = `Hello ${emp.name},\nYour Food & Beverages ERP account has been created.\n\nUsername/Email: ${username}\nRole: ${emp.designation || emp.role}\nDepartment: ${emp.department}\nPortal Link: ${window.location.origin}\n\nUse the password shared by your administrator.`;
-    navigator.clipboard.writeText(text);
-    if (triggerError) triggerError('Login message copied to clipboard!', 'success');
+    try {
+      const copied = await copyTextToClipboard(text);
+      if (triggerError) {
+        triggerError(copied ? 'Login message copied to clipboard!' : 'Unable to copy login message automatically.', copied ? 'success' : 'error');
+      }
+    } catch (err) {
+      if (triggerError) triggerError(err.message || 'Unable to copy login message automatically.');
+    }
   };
 
   return (
