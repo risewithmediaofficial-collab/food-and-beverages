@@ -194,8 +194,8 @@ router.post('/requests/:id/approve', async (req, res) => {
 
     const normalizedAdminEmail = String(adminEmail).trim().toLowerCase();
     const existingUser = await User.findOne({ email: normalizedAdminEmail });
-    if (existingUser) {
-      return res.status(409).json({ success: false, message: 'That admin email is already registered. Please choose another email.' });
+    if (existingUser && existingUser.isSuperAdmin) {
+      return res.status(400).json({ success: false, message: 'Cannot use Master Super Admin email for tenant organizations.' });
     }
 
     // Generate unique slug
@@ -204,7 +204,7 @@ router.post('/requests/:id/approve', async (req, res) => {
 
     const planType = orgReq.selectedPlan?.includes('Enterprise') ? 'Enterprise Unlimited' : orgReq.selectedPlan?.includes('Growth') ? 'Growth Plan' : 'Free Demo';
 
-    // Create Organization First
+    // Create Organization
     const org = await Organization.create({
       name: orgReq.companyName,
       slug,
@@ -221,11 +221,26 @@ router.post('/requests/:id/approve', async (req, res) => {
       allowedModules: ALL_DEFAULT_MODULES,
     });
 
-    // Create Org Admin User Account
+    // Create or Update Org Admin User Account
     const passwordHash = await bcrypt.hash(adminPassword, 10);
 
     let orgAdmin;
-    try {
+    if (existingUser) {
+      existingUser.orgId = org._id;
+      existingUser.name = orgReq.contactPerson || existingUser.name || `${orgReq.companyName} Admin`;
+      existingUser.passwordHash = passwordHash;
+      existingUser.isOrgAdmin = true;
+      existingUser.isSuperAdmin = false;
+      existingUser.roleName = 'General Manager';
+      existingUser.role = 'General Manager';
+      existingUser.department = 'Executive';
+      existingUser.plant = `${orgReq.companyName} Main Facility`;
+      existingUser.status = 'Active';
+      existingUser.isActive = true;
+      existingUser.permissions = ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS', 'ATTENDANCE', 'PRODUCTION', 'QUALITY', 'SALES', 'CRM', 'INVENTORY'];
+      await existingUser.save();
+      orgAdmin = existingUser;
+    } else {
       orgAdmin = await User.create({
         orgId: org._id,
         name: orgReq.contactPerson || `${orgReq.companyName} Admin`,
@@ -241,17 +256,11 @@ router.post('/requests/:id/approve', async (req, res) => {
         isActive: true,
         permissions: ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS', 'ATTENDANCE', 'PRODUCTION', 'QUALITY', 'SALES', 'CRM', 'INVENTORY'],
       });
-
-      // Update Org Admin reference
-      org.adminUserId = orgAdmin._id;
-      await org.save();
-    } catch (innerErr) {
-      await Organization.findByIdAndDelete(org._id).catch(() => null);
-      if (innerErr.code === 11000) {
-        return res.status(409).json({ success: false, message: 'That admin email already exists. Please choose another email.' });
-      }
-      throw innerErr;
     }
+
+    // Update Org Admin reference
+    org.adminUserId = orgAdmin._id;
+    await org.save();
 
     // Create default roles for this Org
     for (const r of DEFAULT_ROLES) {
@@ -339,20 +348,15 @@ router.post('/orgs', async (req, res) => {
 
     const normalizedEmail = String(businessEmail).toLowerCase().trim();
     const existingUser = await User.findOne({ email: normalizedEmail });
-    if (existingUser) {
-      return res.status(409).json({ success: false, message: 'That business admin email is already registered. Please choose a different email.' });
+    if (existingUser && existingUser.isSuperAdmin) {
+      return res.status(400).json({ success: false, message: 'Cannot use Master Super Admin email for tenant organizations.' });
     }
 
-    const existingOrg = await Organization.findOne({ businessEmail: normalizedEmail });
-    if (existingOrg) {
-      return res.status(409).json({ success: false, message: 'An organization already exists with that business email.' });
-    }
-
-    const baseSlug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
-    const slug = `${baseSlug}-${Date.now().toString().slice(-4)}`;
-
-    let org = null;
-    try {
+    // Check if an organization already exists with this email or create new
+    let org = await Organization.findOne({ businessEmail: normalizedEmail });
+    if (!org) {
+      const baseSlug = (name || 'org').toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+      const slug = `${baseSlug}-${Date.now().toString().slice(-4)}`;
       org = await Organization.create({
         name,
         slug,
@@ -363,10 +367,34 @@ router.post('/orgs', async (req, res) => {
         maxUsers: maxUsers ? Number(maxUsers) : 25,
         allowedModules: ALL_DEFAULT_MODULES,
       });
+    } else {
+      org.name = name;
+      org.phone = phone || org.phone || '';
+      org.planType = planType || org.planType || 'Growth Plan';
+      org.status = 'Active';
+      org.maxUsers = maxUsers ? Number(maxUsers) : org.maxUsers;
+      await org.save();
+    }
 
-      const passwordHash = await bcrypt.hash(adminPassword, 10);
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
 
-      const orgAdmin = await User.create({
+    let orgAdmin = existingUser;
+    if (existingUser) {
+      existingUser.orgId = org._id;
+      existingUser.name = adminName || existingUser.name || `${name} Admin`;
+      existingUser.passwordHash = passwordHash;
+      existingUser.isOrgAdmin = true;
+      existingUser.isSuperAdmin = false;
+      existingUser.roleName = 'General Manager';
+      existingUser.role = 'General Manager';
+      existingUser.department = 'Executive';
+      existingUser.plant = `${name} Main Facility`;
+      existingUser.status = 'Active';
+      existingUser.isActive = true;
+      existingUser.permissions = ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS', 'ATTENDANCE', 'PRODUCTION', 'QUALITY', 'SALES', 'CRM', 'INVENTORY'];
+      await existingUser.save();
+    } else {
+      orgAdmin = await User.create({
         orgId: org._id,
         name: adminName || `${name} Admin`,
         email: normalizedEmail,
@@ -381,35 +409,27 @@ router.post('/orgs', async (req, res) => {
         isActive: true,
         permissions: ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS', 'ATTENDANCE', 'PRODUCTION', 'QUALITY', 'SALES', 'CRM', 'INVENTORY'],
       });
-
-      org.adminUserId = orgAdmin._id;
-      await org.save();
-
-      for (const r of DEFAULT_ROLES) {
-        await Role.findOneAndUpdate(
-          { orgId: org._id, name: r.name },
-          { $setOnInsert: { ...r, orgId: org._id } },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
-      }
-
-      return res.status(201).json({
-        success: true,
-        data: {
-          organization: org,
-          adminCredentials: { email: orgAdmin.email, password: adminPassword },
-        },
-        message: 'Organization created successfully',
-      });
-    } catch (innerErr) {
-      if (org) {
-        await Organization.findByIdAndDelete(org._id).catch(() => null);
-      }
-      if (innerErr.code === 11000) {
-        return res.status(409).json({ success: false, message: 'That admin email is already registered. Please choose a different email.' });
-      }
-      throw innerErr;
     }
+
+    org.adminUserId = orgAdmin._id;
+    await org.save();
+
+    for (const r of DEFAULT_ROLES) {
+      await Role.findOneAndUpdate(
+        { orgId: org._id, name: r.name },
+        { $setOnInsert: { ...r, orgId: org._id } },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    }
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        organization: org,
+        adminCredentials: { email: orgAdmin.email, password: adminPassword },
+      },
+      message: 'Organization created successfully',
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
