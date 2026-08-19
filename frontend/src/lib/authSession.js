@@ -1,10 +1,13 @@
 /**
- * Per-Tab Authentication & Session Storage Manager
+ * Strict Per-Tab Authentication & Session Storage Manager
  *
- * Uses `sessionStorage` as the primary storage mechanism so that each browser tab
- * maintains an independent, isolated session (e.g. Tab 1 = Super Admin, Tab 2 = Tenant Admin).
- * Logging out in one tab clears ONLY that tab's session without affecting other tabs.
- * Refreshes in a tab preserve the session state seamlessly across page reloads.
+ * Uses `sessionStorage` strictly so that each browser tab maintains its own independent session:
+ * - Tab 1 can be logged in as Super Admin
+ * - Tab 2 can be logged in as Tenant Admin (Org A)
+ * - Tab 3 can be logged in as Employee (Org B)
+ *
+ * Logging out in one tab clears ONLY that tab's session.
+ * Refreshing a tab preserves that tab's user without switching to any other tab's user.
  */
 
 const TOKEN_KEY = 'access_token';
@@ -12,9 +15,21 @@ const USER_KEY = 'user';
 const INSPECTED_ORG_ID_KEY = 'inspected_org_id';
 const INSPECTED_ORG_KEY = 'inspected_org';
 
+// Clean up any legacy shared localStorage to prevent cross-tab contamination
+try {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(INSPECTED_ORG_ID_KEY);
+    localStorage.removeItem(INSPECTED_ORG_KEY);
+  }
+} catch (e) {
+  // ignore
+}
+
 export const getAuthToken = () => {
   try {
-    return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY) || null;
+    return sessionStorage.getItem(TOKEN_KEY) || null;
   } catch (e) {
     return null;
   }
@@ -22,9 +37,9 @@ export const getAuthToken = () => {
 
 export const getAuthUser = () => {
   try {
-    const token = getAuthToken();
+    const token = sessionStorage.getItem(TOKEN_KEY);
     if (!token) return null;
-    const raw = sessionStorage.getItem(USER_KEY) || localStorage.getItem(USER_KEY);
+    const raw = sessionStorage.getItem(USER_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
   } catch (e) {
@@ -36,14 +51,12 @@ export const setAuthSession = (token, user) => {
   try {
     if (token) {
       sessionStorage.setItem(TOKEN_KEY, token);
-      localStorage.setItem(TOKEN_KEY, token);
     }
     if (user) {
       sessionStorage.setItem(USER_KEY, JSON.stringify(user));
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
     }
   } catch (e) {
-    console.warn('[SessionStorage Warning]', e);
+    console.warn('[SessionStorage Error]', e);
   }
 };
 
@@ -53,19 +66,14 @@ export const clearAuthSession = () => {
     sessionStorage.removeItem(USER_KEY);
     sessionStorage.removeItem(INSPECTED_ORG_ID_KEY);
     sessionStorage.removeItem(INSPECTED_ORG_KEY);
-
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(INSPECTED_ORG_ID_KEY);
-    localStorage.removeItem(INSPECTED_ORG_KEY);
   } catch (e) {
-    console.warn('[SessionStorage Clear Warning]', e);
+    console.warn('[SessionStorage Clear Error]', e);
   }
 };
 
 export const getInspectedOrgId = () => {
   try {
-    return sessionStorage.getItem(INSPECTED_ORG_ID_KEY) || localStorage.getItem(INSPECTED_ORG_ID_KEY) || null;
+    return sessionStorage.getItem(INSPECTED_ORG_ID_KEY) || null;
   } catch (e) {
     return null;
   }
@@ -73,7 +81,7 @@ export const getInspectedOrgId = () => {
 
 export const getInspectedOrg = () => {
   try {
-    const raw = sessionStorage.getItem(INSPECTED_ORG_KEY) || localStorage.getItem(INSPECTED_ORG_KEY);
+    const raw = sessionStorage.getItem(INSPECTED_ORG_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch (e) {
     return null;
@@ -87,7 +95,7 @@ export const setInspectedOrgSession = (org) => {
       sessionStorage.setItem(INSPECTED_ORG_KEY, JSON.stringify(org));
     }
   } catch (e) {
-    console.warn('[SessionStorage Org Warning]', e);
+    console.warn('[SessionStorage Org Error]', e);
   }
 };
 
@@ -95,9 +103,7 @@ export const clearInspectedOrgSession = () => {
   try {
     sessionStorage.removeItem(INSPECTED_ORG_ID_KEY);
     sessionStorage.removeItem(INSPECTED_ORG_KEY);
-    localStorage.removeItem(INSPECTED_ORG_ID_KEY);
-    localStorage.removeItem(INSPECTED_ORG_KEY);
   } catch (e) {
-    console.warn('[SessionStorage Org Clear Warning]', e);
+    console.warn('[SessionStorage Org Clear Error]', e);
   }
 };
