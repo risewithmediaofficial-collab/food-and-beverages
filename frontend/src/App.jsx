@@ -79,6 +79,19 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Listen for unauthorized 401 events to cleanly reset session
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setUser(null);
+      setInspectedOrg(null);
+      if (location.pathname !== '/login' && location.pathname !== '/superadmin/login') {
+        navigate('/login', { replace: true });
+      }
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, [location.pathname, navigate]);
+
   useEffect(() => {
     const savedUser = getAuthUser();
     if (savedUser) {
@@ -91,6 +104,8 @@ function App() {
           navigate('/dashboard', { replace: true });
         }
       }
+    } else {
+      setUser(null);
     }
   }, [location.pathname, navigate]);
 

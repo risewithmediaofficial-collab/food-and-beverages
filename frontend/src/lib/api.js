@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getAuthToken, getInspectedOrgId } from './authSession';
+import { getAuthToken, getInspectedOrgId, clearAuthSession } from './authSession';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
@@ -28,7 +28,18 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    console.warn('API Warning:', error.response?.data || error.message);
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+
+    // If 401 Unauthorized on protected route, clean stale session
+    if (status === 401 && !url.includes('/auth/login') && !url.includes('/superadmin/login') && !url.includes('/public/')) {
+      console.warn('[API Auth] Session expired or unauthorized, clearing local tab session.');
+      clearAuthSession();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+      }
+    }
+
     return Promise.reject(error.response?.data || { message: error.message });
   }
 );

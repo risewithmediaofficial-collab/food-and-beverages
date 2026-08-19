@@ -22,6 +22,8 @@ export const getAuthToken = () => {
 
 export const getAuthUser = () => {
   try {
+    const token = getAuthToken();
+    if (!token) return null;
     const raw = sessionStorage.getItem(USER_KEY) || localStorage.getItem(USER_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
@@ -34,7 +36,7 @@ export const setAuthSession = (token, user) => {
   try {
     if (token) {
       sessionStorage.setItem(TOKEN_KEY, token);
-      localStorage.setItem(TOKEN_KEY, token); // Keep sync for initial tab duplication
+      localStorage.setItem(TOKEN_KEY, token);
     }
     if (user) {
       sessionStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -52,7 +54,6 @@ export const clearAuthSession = () => {
     sessionStorage.removeItem(INSPECTED_ORG_ID_KEY);
     sessionStorage.removeItem(INSPECTED_ORG_KEY);
 
-    // Also clear localStorage for this domain to avoid stale tokens
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(INSPECTED_ORG_ID_KEY);
