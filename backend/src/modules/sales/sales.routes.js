@@ -1,12 +1,13 @@
 import express from 'express';
 import { SalesOrder, Quotation, SalesInvoice, Payment } from './sales.model.js';
 import { Customer } from '../crm/crm.model.js';
+import { getTenantQuery, attachTenantOrgId } from '../../common/utils/tenantScope.js';
 
 const router = express.Router();
 
 router.get('/orders', async (req, res) => {
   try {
-    const orders = await SalesOrder.find({ isActive: true }).populate('customerId').sort({ createdAt: -1 });
+    const orders = await SalesOrder.find(getTenantQuery(req, { isActive: true })).populate('customerId').sort({ createdAt: -1 });
     const mapped = orders.map((o) => {
       const obj = o.toObject();
       if (!obj.customerName && obj.customerId?.name) {
@@ -26,14 +27,14 @@ router.post('/orders', async (req, res) => {
 
     // Auto-create or resolve Customer if customerId is not provided
     if (!customerId && customerName) {
-      let cust = await Customer.findOne({ name: new RegExp(`^${String(customerName).trim()}$`, 'i') });
+      let cust = await Customer.findOne(getTenantQuery(req, { name: new RegExp(`^${String(customerName).trim()}$`, 'i') }));
       if (!cust) {
-        cust = await Customer.create({
+        cust = await Customer.create(attachTenantOrgId(req, {
           name: String(customerName).trim(),
           email: `${String(customerName).trim().toLowerCase().replace(/[^a-z0-9]/g, '')}@customer.com`,
           phone: '',
           type: 'retail',
-        });
+        }));
       }
       customerId = cust._id;
     }
@@ -52,7 +53,7 @@ router.post('/orders', async (req, res) => {
     });
 
     const orderNo = `SO-${Math.floor(10000 + Math.random() * 90000)}`;
-    const order = new SalesOrder({
+    const orderPayload = attachTenantOrgId(req, {
       orderNo,
       customerId,
       customerName: customerName || 'Valued Customer',
@@ -60,6 +61,7 @@ router.post('/orders', async (req, res) => {
       totalAmount: Number(totalAmount || formattedItems.reduce((acc, i) => acc + i.amount, 0)),
       status: status || 'pending',
     });
+    const order = new SalesOrder(orderPayload);
 
     await order.save();
     res.status(201).json({ success: true, data: order });
@@ -70,7 +72,7 @@ router.post('/orders', async (req, res) => {
 
 router.post('/orders/:id/invoice', async (req, res) => {
   try {
-    const order = await SalesOrder.findById(req.params.id);
+    const order = await SalesOrder.findOne(getTenantQuery(req, { _id: req.params.id }));
     if (!order) return res.status(404).json({ success: false, message: 'Sales Order not found' });
 
     const invoiceNo = `INV-${Date.now().toString().slice(-6)}`;
@@ -78,7 +80,7 @@ router.post('/orders/:id/invoice', async (req, res) => {
     const gstAmount = Math.round(subtotal * 0.18);
     const totalAmount = subtotal + gstAmount;
 
-    const invoice = new SalesInvoice({
+    const invoice = new SalesInvoice(attachTenantOrgId(req, {
       factoryId: order.factoryId,
       invoiceNo,
       salesOrderId: order._id,
@@ -89,7 +91,7 @@ router.post('/orders/:id/invoice', async (req, res) => {
       gstAmount,
       totalAmount,
       dueAmount: totalAmount,
-    });
+    }));
 
     await invoice.save();
     order.status = 'invoiced';
@@ -103,7 +105,7 @@ router.post('/orders/:id/invoice', async (req, res) => {
 
 router.put('/orders/:id', async (req, res) => {
   try {
-    const order = await SalesOrder.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const order = await SalesOrder.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     if (!order) return res.status(404).json({ success: false, message: 'Sales order not found' });
     res.json({ success: true, data: order });
   } catch (err) {
@@ -113,7 +115,7 @@ router.put('/orders/:id', async (req, res) => {
 
 router.delete('/orders/:id', async (req, res) => {
   try {
-    const order = await SalesOrder.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    const order = await SalesOrder.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), { isActive: false }, { new: true });
     if (!order) return res.status(404).json({ success: false, message: 'Sales order not found' });
     res.json({ success: true, message: 'Sales order deleted successfully' });
   } catch (err) {
@@ -123,7 +125,7 @@ router.delete('/orders/:id', async (req, res) => {
 
 router.get('/invoices', async (req, res) => {
   try {
-    const invoices = await SalesInvoice.find({ isActive: true }).populate('customerId').sort({ createdAt: -1 });
+    const invoices = await SalesInvoice.find(getTenantQuery(req, { isActive: true })).populate('customerId').sort({ createdAt: -1 });
     res.json({ success: true, data: invoices });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -132,7 +134,7 @@ router.get('/invoices', async (req, res) => {
 
 router.put('/invoices/:id', async (req, res) => {
   try {
-    const invoice = await SalesInvoice.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const invoice = await SalesInvoice.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
     res.json({ success: true, data: invoice });
   } catch (err) {
@@ -142,7 +144,7 @@ router.put('/invoices/:id', async (req, res) => {
 
 router.delete('/invoices/:id', async (req, res) => {
   try {
-    const invoice = await SalesInvoice.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    const invoice = await SalesInvoice.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), { isActive: false }, { new: true });
     if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
     res.json({ success: true, message: 'Invoice deleted successfully' });
   } catch (err) {

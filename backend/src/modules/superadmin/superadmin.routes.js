@@ -6,6 +6,18 @@ import { OrgRequest, Organization, ALL_DEFAULT_MODULES } from './superadmin.mode
 import { User, Role } from '../auth/auth.model.js';
 import { DEFAULT_ROLES } from '../auth/auth.routes.js';
 import { normalizeCompanyRequestInput } from './superadmin.helpers.js';
+import { Item, StockBatch, Warehouse } from '../inventory/inventory.model.js';
+import { Lead, Customer } from '../crm/crm.model.js';
+import { Supplier, PurchaseOrder } from '../purchase/purchase.model.js';
+import { SalesOrder, SalesInvoice } from '../sales/sales.model.js';
+import { ProductionOrder, ProductionPlan, Batch } from '../production/production.model.js';
+import { Machine, MachineLog, MaintenanceTicket } from '../machine/machine.model.js';
+import { QCCheck } from '../quality/quality.model.js';
+import { DispatchOrder } from '../dispatch/dispatch.model.js';
+import { Employee } from '../hr/hr.model.js';
+import { Ledger, Expense } from '../finance/finance.model.js';
+import { Compliance } from '../compliance/compliance.model.js';
+import { Factory, Department } from '../org/org.model.js';
 
 const router = express.Router();
 
@@ -97,6 +109,34 @@ export const ensureSuperAdmin = async () => {
           }
         }
       }
+
+      // Backfill any legacy records without orgId into defaultOrg for clean isolation
+      const legacyFilter = { $or: [{ orgId: { $exists: false } }, { orgId: null }] };
+      const setOrg = { $set: { orgId: defaultOrg._id } };
+
+      await Promise.allSettled([
+        Item.updateMany(legacyFilter, setOrg),
+        StockBatch.updateMany(legacyFilter, setOrg),
+        Warehouse.updateMany(legacyFilter, setOrg),
+        Lead.updateMany(legacyFilter, setOrg),
+        Customer.updateMany(legacyFilter, setOrg),
+        Supplier.updateMany(legacyFilter, setOrg),
+        PurchaseOrder.updateMany(legacyFilter, setOrg),
+        SalesOrder.updateMany(legacyFilter, setOrg),
+        SalesInvoice.updateMany(legacyFilter, setOrg),
+        ProductionOrder.updateMany(legacyFilter, setOrg),
+        ProductionPlan.updateMany(legacyFilter, setOrg),
+        Batch.updateMany(legacyFilter, setOrg),
+        Machine.updateMany(legacyFilter, setOrg),
+        QCCheck.updateMany(legacyFilter, setOrg),
+        DispatchOrder.updateMany(legacyFilter, setOrg),
+        Employee.updateMany(legacyFilter, setOrg),
+        Ledger.updateMany(legacyFilter, setOrg),
+        Expense.updateMany(legacyFilter, setOrg),
+        Compliance.updateMany(legacyFilter, setOrg),
+        Factory.updateMany(legacyFilter, setOrg),
+        Department.updateMany(legacyFilter, setOrg),
+      ]);
     }
   } catch (err) {
     console.warn('[SuperAdmin Warning] Could not initialize Super Admin account/default org:', err.message);

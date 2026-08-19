@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 const ledgerSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   accountName: { type: String, required: true },
   type: { type: String, enum: ['debit', 'credit'], required: true },
@@ -14,6 +15,7 @@ const ledgerSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const expenseSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   expenseDate: { type: String, default: () => new Date().toISOString().split('T')[0] },
   category: { type: String, required: true },
   description: { type: String },

@@ -1,9 +1,10 @@
 import mongoose from 'mongoose';
 
 const productionOrderSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
-  orderNo: { type: String, required: true, unique: true },
-  batchId: { type: String, required: true, unique: true },
+  orderNo: { type: String, required: true },
+  batchId: { type: String, required: true },
   productName: { type: String, required: true },
   salesOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'SalesOrder' },
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
@@ -34,7 +35,11 @@ const productionOrderSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+productionOrderSchema.index({ orgId: 1, orderNo: 1 });
+productionOrderSchema.index({ orgId: 1, batchId: 1 });
+
 const productionPlanSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   planCode: { type: String, required: true },
   productName: { type: String, required: true },
   targetQty: Number,
@@ -50,7 +55,10 @@ const productionPlanSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+productionPlanSchema.index({ orgId: 1, planCode: 1 });
+
 const batchSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   batchNo: String,
   batchCode: { type: String, required: true },
   productName: String,
@@ -64,6 +72,8 @@ const batchSchema = new mongoose.Schema({
   qcStatus: { type: String, default: 'Quarantined' },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
+
+batchSchema.index({ orgId: 1, batchCode: 1 });
 
 export const ProductionOrder = mongoose.models.ProductionOrder || mongoose.model('ProductionOrder', productionOrderSchema);
 export const ProductionPlan = mongoose.models.ProductionPlan || mongoose.model('ProductionPlan', productionPlanSchema);

@@ -9,6 +9,7 @@ const addressSchema = new mongoose.Schema({
 });
 
 const leadSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   name: { type: String, required: true },
   phone: String,
@@ -31,6 +32,7 @@ const leadSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const customerSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   name: { type: String, required: true },
   email: String,

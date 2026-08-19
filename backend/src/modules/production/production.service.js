@@ -7,7 +7,7 @@ import { getIO } from '../../config/socket.js';
 import { QCCheck } from '../quality/quality.model.js';
 
 export const productionService = {
-  async createProductionOrder({ factoryId, productId, recipeId, productionPlanId, qtyPlanned, productName = 'Juice Bottle (500ml)', unit = 'Bottles', batchId: customBatchId, salesOrderId, shiftId = 'Morning', supervisorId, productCode = 'JUICE' }) {
+  async createProductionOrder({ orgId, factoryId, productId, recipeId, productionPlanId, qtyPlanned, productName = 'Juice Bottle (500ml)', unit = 'Bottles', batchId: customBatchId, salesOrderId, shiftId = 'Morning', supervisorId, productCode = 'JUICE' }) {
     const sequence = (await ProductionOrder.countDocuments()) + 1;
     const batchId = customBatchId || generateBatchId('F1', productCode, new Date(), sequence);
     const orderNo = `PO-${Date.now().toString().slice(-6)}`;
@@ -23,6 +23,7 @@ export const productionService = {
 
     const materialCost = (bom.requirements?.length || 2) * 1500;
     const order = new ProductionOrder({
+      orgId,
       factoryId,
       orderNo,
       batchId,
@@ -46,8 +47,8 @@ export const productionService = {
 
     await order.save();
     try {
-      eventBus.emit(EVENTS.PRODUCTION_ORDER_CREATED, { orderId: order._id, batchId, qtyPlanned });
-      getIO().emit('production:order-updated', { orderId: order._id, status: order.status, batchId });
+      eventBus.emit(EVENTS.PRODUCTION_ORDER_CREATED, { orgId, orderId: order._id, batchId, qtyPlanned });
+      getIO().emit('production:order-updated', { orgId, orderId: order._id, status: order.status, batchId });
     } catch (e) {
       console.warn('[ProductionService Socket Warning] Could not broadcast event:', e.message);
     }
@@ -80,6 +81,7 @@ export const productionService = {
 
     if (!productionOrder) {
       productionOrder = await this.createProductionOrder({
+        orgId: plan.orgId,
         factoryId: plan.factoryId,
         productionPlanId: plan._id,
         productName: plan.productName,
@@ -99,6 +101,7 @@ export const productionService = {
     if (['completed', 'in quality testing'].includes(statusLower)) {
       if (productionOrder.status !== 'completed' && productionOrder.status !== 'quality_testing') {
         const completedResult = await this.completeProductionOrder(productionOrder._id, {
+          orgId: plan.orgId,
           qtyProduced: productionOrder.qtyPlanned || plan.targetQty || 1000,
         });
         productionOrder = completedResult.order;
@@ -137,6 +140,7 @@ export const productionService = {
     }
     for (const req of bom.requirements) {
       await inventoryService.stockOut({
+        orgId: order.orgId,
         factoryId: order.factoryId,
         itemId: req.itemId,
         qty: req.requiredQty,
@@ -149,16 +153,17 @@ export const productionService = {
     order.startedAt = new Date();
     await order.save();
 
-    eventBus.emit(EVENTS.PRODUCTION_ORDER_STARTED, { orderId: order._id, batchId: order.batchId });
-    getIO().emit('production:order-updated', { orderId: order._id, status: 'running', batchId: order.batchId });
+    eventBus.emit(EVENTS.PRODUCTION_ORDER_STARTED, { orgId: order.orgId, orderId: order._id, batchId: order.batchId });
+    getIO().emit('production:order-updated', { orgId: order.orgId, orderId: order._id, status: 'running', batchId: order.batchId });
 
     return order;
   },
 
-  async completeProductionOrder(orderId, { qtyProduced, wastageQty = 0 }) {
+  async completeProductionOrder(orderId, { orgId, qtyProduced, wastageQty = 0 }) {
     const order = await ProductionOrder.findById(orderId);
     if (!order) throw new Error('Production Order not found');
 
+    const effectiveOrgId = orgId || order.orgId;
     order.qtyProduced = Number(qtyProduced || order.qtyPlanned || 1000);
     order.wastageQty = Number(wastageQty || 0);
     order.status = 'quality_testing';
@@ -166,15 +171,19 @@ export const productionService = {
 
     // Auto-create / update Batch in Batch Management
     try {
-      let batch = await Batch.findOne({
+      const batchQuery = {
         $or: [{ batchCode: order.batchId }, { batchNo: order.batchId }],
         isActive: true,
-      });
+      };
+      if (effectiveOrgId) batchQuery.orgId = effectiveOrgId;
+
+      let batch = await Batch.findOne(batchQuery);
 
       const yieldPercent = Math.min(100, Math.round(((order.qtyProduced) / (order.qtyPlanned || 1)) * 100 * 10) / 10);
 
       if (!batch) {
         batch = new Batch({
+          orgId: effectiveOrgId,
           batchNo: order.batchId,
           batchCode: order.batchId,
           productName: order.productName,
@@ -200,15 +209,19 @@ export const productionService = {
     }
 
     // Auto-create / update QCCheck for Quality Control
-    let qcCheck = await QCCheck.findOne({
+    const qcQuery = {
       $or: [
         { refType: 'finished_goods', refId: order._id, isActive: true },
         { batchId: order.batchId, isActive: true },
       ],
-    });
+    };
+    if (effectiveOrgId) qcQuery.orgId = effectiveOrgId;
+
+    let qcCheck = await QCCheck.findOne(qcQuery);
 
     if (!qcCheck) {
       qcCheck = new QCCheck({
+        orgId: effectiveOrgId,
         factoryId: order.factoryId,
         checkNo: `QC-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`,
         refType: 'finished_goods',
@@ -238,8 +251,8 @@ export const productionService = {
       await qcCheck.save();
     }
 
-    eventBus.emit(EVENTS.PRODUCTION_ORDER_COMPLETED, { orderId: order._id, batchId: order.batchId, qtyProduced: order.qtyProduced });
-    getIO().emit('production:order-updated', { orderId: order._id, status: 'quality_testing', batchId: order.batchId });
+    eventBus.emit(EVENTS.PRODUCTION_ORDER_COMPLETED, { orgId: effectiveOrgId, orderId: order._id, batchId: order.batchId, qtyProduced: order.qtyProduced });
+    getIO().emit('production:order-updated', { orgId: effectiveOrgId, orderId: order._id, status: 'quality_testing', batchId: order.batchId });
 
     return { order, qcCheck };
   }

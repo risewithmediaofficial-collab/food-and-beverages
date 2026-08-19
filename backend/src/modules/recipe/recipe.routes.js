@@ -1,12 +1,13 @@
 import express from 'express';
 import { Recipe } from './recipe.model.js';
 import { recipeService } from './recipe.service.js';
+import { getTenantQuery, attachTenantOrgId } from '../../common/utils/tenantScope.js';
 
 const router = express.Router();
 
 router.get('/', async (req, res) => {
   try {
-    const recipes = await Recipe.find({ isActive: true }).populate('productId').populate('ingredients.itemId');
+    const recipes = await Recipe.find(getTenantQuery(req, { isActive: true })).populate('productId').populate('ingredients.itemId');
     res.json({ success: true, data: recipes });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -15,7 +16,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const recipe = new Recipe(req.body);
+    const recipe = new Recipe(attachTenantOrgId(req, req.body));
     await recipe.save();
     res.status(201).json({ success: true, data: recipe });
   } catch (err) {
@@ -35,7 +36,7 @@ router.get('/:id/calculate', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const recipe = await Recipe.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const recipe = await Recipe.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     if (!recipe) return res.status(404).json({ success: false, message: 'Recipe not found' });
     res.json({ success: true, data: recipe });
   } catch (err) {
@@ -45,7 +46,7 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const recipe = await Recipe.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    const recipe = await Recipe.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), { isActive: false }, { new: true });
     if (!recipe) return res.status(404).json({ success: false, message: 'Recipe not found' });
     res.json({ success: true, message: 'Recipe deleted successfully' });
   } catch (err) {

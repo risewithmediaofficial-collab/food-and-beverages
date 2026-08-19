@@ -1,9 +1,10 @@
 import mongoose from 'mongoose';
 
 const itemSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   name: { type: String, required: true },
-  code: { type: String, required: true, unique: true },
+  code: { type: String, required: true },
   type: {
     type: String,
     enum: ['raw_material', 'packaging', 'finished_good'],
@@ -15,7 +16,10 @@ const itemSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+itemSchema.index({ orgId: 1, code: 1 });
+
 const stockBatchSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
   warehouseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse' },
@@ -30,7 +34,10 @@ const stockBatchSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+stockBatchSchema.index({ orgId: 1, batchNo: 1 });
+
 const stockMovementSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
   batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'StockBatch' },
@@ -48,12 +55,9 @@ const stockMovementSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
-export const Item = mongoose.models.Item || mongoose.model('Item', itemSchema);
-export const StockBatch = mongoose.models.StockBatch || mongoose.model('StockBatch', stockBatchSchema);
-export const StockMovement = mongoose.models.StockMovement || mongoose.model('StockMovement', stockMovementSchema);
-
 const warehouseSchema = new mongoose.Schema({
-  whCode: { type: String, required: true, unique: true },
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
+  whCode: { type: String, required: true },
   whName: { type: String, required: true },
   location: { type: String, default: '' },
   storageType: { type: String, default: 'Cold Storage (Puree & Concentrate)' },
@@ -65,5 +69,9 @@ const warehouseSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
-export const Warehouse = mongoose.models.Warehouse || mongoose.model('Warehouse', warehouseSchema);
+warehouseSchema.index({ orgId: 1, whCode: 1 });
 
+export const Item = mongoose.models.Item || mongoose.model('Item', itemSchema);
+export const StockBatch = mongoose.models.StockBatch || mongoose.model('StockBatch', stockBatchSchema);
+export const StockMovement = mongoose.models.StockMovement || mongoose.model('StockMovement', stockMovementSchema);
+export const Warehouse = mongoose.models.Warehouse || mongoose.model('Warehouse', warehouseSchema);

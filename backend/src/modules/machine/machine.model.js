@@ -1,10 +1,11 @@
 import mongoose from 'mongoose';
 
 const machineSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   departmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
   name: { type: String, required: true },
-  code: { type: String, required: true, unique: true },
+  code: { type: String, required: true },
   category: { type: String, enum: ['washer', 'extractor', 'pasteurizer', 'homogenizer', 'chiller', 'filler', 'capper', 'labeler', 'packager'], required: true },
   capacityUnitsPerHour: { type: Number, default: 1000 },
   currentStatus: {
@@ -19,6 +20,8 @@ const machineSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+machineSchema.index({ orgId: 1, code: 1 });
+
 const machineEventSchema = new mongoose.Schema({
   type: {
     type: String,
@@ -30,6 +33,7 @@ const machineEventSchema = new mongoose.Schema({
 });
 
 const machineLogSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   machineId: { type: mongoose.Schema.Types.ObjectId, ref: 'Machine', required: true },
   date: { type: Date, default: Date.now },
@@ -55,6 +59,7 @@ const machineLogSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const maintenanceTicketSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   ticketRef: { type: String, required: true },
   machineName: { type: String, required: true },
   machineCode: String,
@@ -66,7 +71,8 @@ const maintenanceTicketSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+maintenanceTicketSchema.index({ orgId: 1, ticketRef: 1 });
+
 export const Machine = mongoose.models.Machine || mongoose.model('Machine', machineSchema);
 export const MachineLog = mongoose.models.MachineLog || mongoose.model('MachineLog', machineLogSchema);
 export const MaintenanceTicket = mongoose.models.MaintenanceTicket || mongoose.model('MaintenanceTicket', maintenanceTicketSchema);
-

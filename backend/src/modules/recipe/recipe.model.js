@@ -8,6 +8,7 @@ const ingredientSchema = new mongoose.Schema({
 });
 
 const recipeSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   name: { type: String, required: true },
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },

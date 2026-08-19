@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 const supplierSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   name: { type: String, required: true },
   contactPerson: String,
@@ -19,8 +20,9 @@ const poItemSchema = new mongoose.Schema({
 });
 
 const purchaseOrderSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
-  poNo: { type: String, required: true, unique: true },
+  poNo: { type: String, required: true },
   supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', required: true },
   items: [poItemSchema],
   totalAmount: { type: Number, required: true },
@@ -34,6 +36,8 @@ const purchaseOrderSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+purchaseOrderSchema.index({ orgId: 1, poNo: 1 });
+
 const grnItemSchema = new mongoose.Schema({
   rawMaterialId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item', required: true },
   qtyOrdered: Number,
@@ -44,8 +48,9 @@ const grnItemSchema = new mongoose.Schema({
 });
 
 const grnSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
-  grnNo: { type: String, required: true, unique: true },
+  grnNo: { type: String, required: true },
   purchaseOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder', required: true },
   supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', required: true },
   items: [grnItemSchema],
@@ -54,6 +59,8 @@ const grnSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
+
+grnSchema.index({ orgId: 1, grnNo: 1 });
 
 export const Supplier = mongoose.models.Supplier || mongoose.model('Supplier', supplierSchema);
 export const PurchaseOrder = mongoose.models.PurchaseOrder || mongoose.model('PurchaseOrder', purchaseOrderSchema);

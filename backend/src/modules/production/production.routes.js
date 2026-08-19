@@ -1,13 +1,14 @@
 import express from 'express';
 import { ProductionOrder, ProductionPlan, Batch } from './production.model.js';
 import { productionService } from './production.service.js';
+import { getTenantQuery, attachTenantOrgId } from '../../common/utils/tenantScope.js';
 
 const router = express.Router();
 
 // 1. Production Orders
 router.get('/orders', async (req, res) => {
   try {
-    const orders = await ProductionOrder.find({ isActive: true })
+    const orders = await ProductionOrder.find(getTenantQuery(req, { isActive: true }))
       .populate('productId')
       .populate('recipeId')
       .sort({ createdAt: -1 });
@@ -19,7 +20,8 @@ router.get('/orders', async (req, res) => {
 
 router.post('/orders', async (req, res) => {
   try {
-    const result = await productionService.createProductionOrder(req.body);
+    const payload = attachTenantOrgId(req, req.body);
+    const result = await productionService.createProductionOrder(payload);
     res.status(201).json({ success: true, data: result });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -37,7 +39,8 @@ router.post('/orders/:id/start', async (req, res) => {
 
 router.post('/orders/:id/complete', async (req, res) => {
   try {
-    const result = await productionService.completeProductionOrder(req.params.id, req.body);
+    const payload = attachTenantOrgId(req, req.body);
+    const result = await productionService.completeProductionOrder(req.params.id, payload);
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -46,7 +49,7 @@ router.post('/orders/:id/complete', async (req, res) => {
 
 router.put('/orders/:id', async (req, res) => {
   try {
-    const order = await ProductionOrder.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const order = await ProductionOrder.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     if (!order) return res.status(404).json({ success: false, message: 'Production order not found' });
     res.json({ success: true, data: order });
   } catch (err) {
@@ -56,7 +59,7 @@ router.put('/orders/:id', async (req, res) => {
 
 router.delete('/orders/:id', async (req, res) => {
   try {
-    const order = await ProductionOrder.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    const order = await ProductionOrder.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), { isActive: false }, { new: true });
     if (!order) return res.status(404).json({ success: false, message: 'Production order not found' });
     res.json({ success: true, message: 'Production order deleted successfully' });
   } catch (err) {
@@ -67,7 +70,7 @@ router.delete('/orders/:id', async (req, res) => {
 // 2. Production Planning APIs
 router.get('/plans', async (req, res) => {
   try {
-    const plans = await ProductionPlan.find({ isActive: true }).sort({ createdAt: -1 });
+    const plans = await ProductionPlan.find(getTenantQuery(req, { isActive: true })).sort({ createdAt: -1 });
     res.json({ success: true, data: plans });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -76,7 +79,8 @@ router.get('/plans', async (req, res) => {
 
 router.post('/plans', async (req, res) => {
   try {
-    const result = await productionService.createProductionPlan(req.body);
+    const payload = attachTenantOrgId(req, req.body);
+    const result = await productionService.createProductionPlan(payload);
     res.status(201).json({ success: true, data: result.plan, routedProductionOrder: result.productionOrder });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -85,7 +89,7 @@ router.post('/plans', async (req, res) => {
 
 router.put('/plans/:id', async (req, res) => {
   try {
-    const plan = await ProductionPlan.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const plan = await ProductionPlan.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     if (!plan) return res.status(404).json({ success: false, message: 'Production plan not found' });
     const result = await productionService.routeProductionPlanToOrder(plan);
     res.json({ success: true, data: result.plan, routedProductionOrder: result.productionOrder });
@@ -105,7 +109,7 @@ router.post('/plans/:id/complete', async (req, res) => {
 
 router.delete('/plans/:id', async (req, res) => {
   try {
-    await ProductionPlan.findByIdAndDelete(req.params.id);
+    await ProductionPlan.findOneAndDelete(getTenantQuery(req, { _id: req.params.id }));
     res.json({ success: true, message: 'Plan deleted' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -115,7 +119,7 @@ router.delete('/plans/:id', async (req, res) => {
 // 3. Batch Management APIs
 router.get('/batches', async (req, res) => {
   try {
-    const batches = await Batch.find({ isActive: true }).sort({ createdAt: -1 });
+    const batches = await Batch.find(getTenantQuery(req, { isActive: true })).sort({ createdAt: -1 });
     res.json({ success: true, data: batches });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -124,7 +128,7 @@ router.get('/batches', async (req, res) => {
 
 router.post('/batches', async (req, res) => {
   try {
-    const batch = new Batch(req.body);
+    const batch = new Batch(attachTenantOrgId(req, req.body));
     await batch.save();
     res.status(201).json({ success: true, data: batch });
   } catch (err) {
@@ -134,7 +138,7 @@ router.post('/batches', async (req, res) => {
 
 router.put('/batches/:id', async (req, res) => {
   try {
-    const batch = await Batch.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const batch = await Batch.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     res.json({ success: true, data: batch });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -143,7 +147,7 @@ router.put('/batches/:id', async (req, res) => {
 
 router.delete('/batches/:id', async (req, res) => {
   try {
-    await Batch.findByIdAndDelete(req.params.id);
+    await Batch.findOneAndDelete(getTenantQuery(req, { _id: req.params.id }));
     res.json({ success: true, message: 'Batch deleted' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

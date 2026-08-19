@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 const complianceSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   licenseName: { type: String, required: true },
   authority: { type: String, required: true },

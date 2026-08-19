@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 const orgProfileSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   enterpriseName: { type: String, default: 'Sunrise Beverages & Juices Private Limited' },
   hqAddress: { type: String, default: 'Plot 42, MIDC Industrial Area, Ambad, Nashik, Maharashtra - 422010' },
   gstin: { type: String, default: '27AABCS1234F1Z9' },
@@ -11,6 +12,7 @@ const orgProfileSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const factorySchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   plantCode: { type: String, required: true },
   name: { type: String, required: true },
   code: { type: String },
@@ -24,6 +26,7 @@ const factorySchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const departmentSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   deptCode: { type: String, required: true },
   name: { type: String, required: true },
   code: String,
@@ -36,6 +39,7 @@ const departmentSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const warehouseSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   name: { type: String, required: true },
   type: { type: String, default: 'raw_materials' },
@@ -44,6 +48,7 @@ const warehouseSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const auditLogSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   timestamp: { type: String, default: () => new Date().toISOString().replace('T', ' ').substring(0, 19) },
   user: { type: String, required: true },
   ipAddress: { type: String, default: '192.168.1.1' },
@@ -58,4 +63,3 @@ export const Factory = mongoose.models.Factory || mongoose.model('Factory', fact
 export const Department = mongoose.models.Department || mongoose.model('Department', departmentSchema);
 export const Warehouse = mongoose.models.Warehouse || mongoose.model('Warehouse', warehouseSchema);
 export const AuditLog = mongoose.models.AuditLog || mongoose.model('AuditLog', auditLogSchema);
-

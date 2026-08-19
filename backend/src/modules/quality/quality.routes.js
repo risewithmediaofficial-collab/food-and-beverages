@@ -2,22 +2,27 @@ import express from 'express';
 import { QCCheck } from './quality.model.js';
 import { ProductionOrder } from '../production/production.model.js';
 import { qualityService } from './quality.service.js';
+import { getTenantQuery, attachTenantOrgId } from '../../common/utils/tenantScope.js';
 
 const router = express.Router();
 
 router.get('/checks', async (req, res) => {
   try {
+    const effectiveOrgId = req.orgId || req.user?.orgId;
     // Auto-reconcile any production orders in quality_testing status
-    const pendingOrders = await ProductionOrder.find({ status: 'quality_testing', isActive: true });
+    const pendingOrderFilter = getTenantQuery(req, { status: 'quality_testing', isActive: true });
+    const pendingOrders = await ProductionOrder.find(pendingOrderFilter);
     for (const order of pendingOrders) {
-      let check = await QCCheck.findOne({ refType: 'finished_goods', refId: order._id, isActive: true });
-      if (!check) {
-        // Also check by batchId
-        check = await QCCheck.findOne({ batchId: order.batchId, isActive: true });
-      }
+      const qcQuery = {
+        $or: [{ refType: 'finished_goods', refId: order._id, isActive: true }, { batchId: order.batchId, isActive: true }],
+      };
+      if (effectiveOrgId) qcQuery.orgId = effectiveOrgId;
+
+      let check = await QCCheck.findOne(qcQuery);
 
       if (!check) {
         check = new QCCheck({
+          orgId: effectiveOrgId || order.orgId,
           factoryId: order.factoryId,
           checkNo: `QC-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`,
           refType: 'finished_goods',
@@ -56,13 +61,17 @@ router.get('/checks', async (req, res) => {
           check.refId = order._id;
           needsUpdate = true;
         }
+        if (!check.orgId && (effectiveOrgId || order.orgId)) {
+          check.orgId = effectiveOrgId || order.orgId;
+          needsUpdate = true;
+        }
         if (needsUpdate) {
           await check.save();
         }
       }
     }
 
-    const checks = await QCCheck.find({ isActive: true })
+    const checks = await QCCheck.find(getTenantQuery(req, { isActive: true }))
       .populate('refId')
       .sort({ createdAt: -1 });
     res.json({ success: true, data: checks });
@@ -75,6 +84,7 @@ router.post('/checks/:id/decision', async (req, res) => {
   try {
     const check = await qualityService.processQCDecision(req.params.id, {
       ...req.body,
+      orgId: req.orgId || req.user?.orgId,
       userId: req.user?.id,
     });
     res.json({ success: true, data: check });
@@ -85,7 +95,7 @@ router.post('/checks/:id/decision', async (req, res) => {
 
 router.put('/checks/:id/parameters', async (req, res) => {
   try {
-    const check = await QCCheck.findById(req.params.id);
+    const check = await QCCheck.findOne(getTenantQuery(req, { _id: req.params.id }));
     if (!check) return res.status(404).json({ success: false, message: 'QC check not found' });
     if (req.body.parameters) check.parameters = req.body.parameters;
     if (req.body.notes) check.notes = req.body.notes;
@@ -99,12 +109,12 @@ router.put('/checks/:id/parameters', async (req, res) => {
 router.post('/checks', async (req, res) => {
   try {
     const checkNo = `QC-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
-    const check = new QCCheck({
+    const check = new QCCheck(attachTenantOrgId(req, {
       refType: 'finished_goods',
       overallResult: 'pending',
       ...req.body,
       checkNo,
-    });
+    }));
     await check.save();
     res.status(201).json({ success: true, data: check });
   } catch (err) {
@@ -114,7 +124,7 @@ router.post('/checks', async (req, res) => {
 
 router.put('/checks/:id', async (req, res) => {
   try {
-    const check = await QCCheck.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const check = await QCCheck.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     if (!check) return res.status(404).json({ success: false, message: 'QC check not found' });
     res.json({ success: true, data: check });
   } catch (err) {
@@ -124,7 +134,7 @@ router.put('/checks/:id', async (req, res) => {
 
 router.delete('/checks/:id', async (req, res) => {
   try {
-    const check = await QCCheck.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    const check = await QCCheck.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), { isActive: false }, { new: true });
     if (!check) return res.status(404).json({ success: false, message: 'QC check not found' });
     res.json({ success: true, message: 'QC check deleted successfully' });
   } catch (err) {

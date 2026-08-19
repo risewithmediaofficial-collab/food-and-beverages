@@ -1,8 +1,9 @@
 import mongoose from 'mongoose';
 
 const dispatchOrderSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
-  dispatchNo: { type: String, required: true, unique: true },
+  dispatchNo: { type: String, required: true },
   salesOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'SalesOrder' },
   productionOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductionOrder' },
   batchId: { type: String, required: true },
@@ -22,6 +23,8 @@ const dispatchOrderSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
+
+dispatchOrderSchema.index({ orgId: 1, dispatchNo: 1 });
 
 export const DispatchOrder = mongoose.models.DispatchOrder || mongoose.model('DispatchOrder', dispatchOrderSchema);
 export const DispatchRecord = DispatchOrder;

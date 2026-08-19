@@ -9,8 +9,9 @@ const salesItemSchema = new mongoose.Schema({
 });
 
 const quotationSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
-  quotationNo: { type: String, required: true, unique: true },
+  quotationNo: { type: String, required: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
   customerName: String,
   items: [salesItemSchema],
@@ -21,9 +22,12 @@ const quotationSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+quotationSchema.index({ orgId: 1, quotationNo: 1 });
+
 const salesOrderSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
-  orderNo: { type: String, required: true, unique: true },
+  orderNo: { type: String, required: true },
   quotationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Quotation' },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
   customerName: String,
@@ -39,9 +43,12 @@ const salesOrderSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+salesOrderSchema.index({ orgId: 1, orderNo: 1 });
+
 const salesInvoiceSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
-  invoiceNo: { type: String, required: true, unique: true },
+  invoiceNo: { type: String, required: true },
   salesOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'SalesOrder', required: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
   customerName: String,
@@ -57,7 +64,10 @@ const salesInvoiceSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+salesInvoiceSchema.index({ orgId: 1, invoiceNo: 1 });
+
 const paymentSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
   invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'SalesInvoice', required: true },
   amount: { type: Number, required: true },

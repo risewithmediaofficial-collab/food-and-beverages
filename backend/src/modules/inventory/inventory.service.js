@@ -1,12 +1,17 @@
 import { Item, StockBatch, StockMovement } from './inventory.model.js';
 import { eventBus, EVENTS } from '../../common/events/eventBus.js';
 import { getIO } from '../../config/socket.js';
+import { getTenantQuery } from '../../common/utils/tenantScope.js';
 
 export const inventoryService = {
-  async stockIn({ factoryId, itemId, batchNo, qty, refType, refId, warehouseId, costPerUnit, supplierId, mfgDate, expiryDate }) {
-    let batch = await StockBatch.findOne({ itemId, batchNo });
+  async stockIn({ orgId, factoryId, itemId, batchNo, qty, refType, refId, warehouseId, costPerUnit, supplierId, mfgDate, expiryDate }) {
+    const batchFilter = { itemId, batchNo };
+    if (orgId) batchFilter.orgId = orgId;
+
+    let batch = await StockBatch.findOne(batchFilter);
     if (!batch) {
       batch = new StockBatch({
+        orgId,
         factoryId,
         itemId,
         warehouseId,
@@ -24,6 +29,7 @@ export const inventoryService = {
     await batch.save();
 
     const movement = new StockMovement({
+      orgId,
       factoryId,
       itemId,
       batchId: batch._id,
@@ -35,15 +41,18 @@ export const inventoryService = {
     });
     await movement.save();
 
-    eventBus.emit(EVENTS.STOCK_IN, { itemId, batchNo, qty, refType, refId });
-    getIO().emit('inventory:updated', { itemId, batchNo, qty, type: 'in' });
+    eventBus.emit(EVENTS.STOCK_IN, { orgId, itemId, batchNo, qty, refType, refId });
+    getIO().emit('inventory:updated', { orgId, itemId, batchNo, qty, type: 'in' });
 
     return { batch, movement };
   },
 
-  async stockOut({ factoryId, itemId, qty, refType, refId }) {
+  async stockOut({ orgId, factoryId, itemId, qty, refType, refId }) {
     let remainingToDeduct = qty;
-    const availableBatches = await StockBatch.find({ itemId, qty: { $gt: 0 }, status: 'available' }).sort({ mfgDate: 1 });
+    const filter = { itemId, qty: { $gt: 0 }, status: 'available' };
+    if (orgId) filter.orgId = orgId;
+
+    const availableBatches = await StockBatch.find(filter).sort({ mfgDate: 1 });
 
     const totalAvailable = availableBatches.reduce((acc, b) => acc + b.qty, 0);
     if (totalAvailable < qty) {
@@ -66,6 +75,7 @@ export const inventoryService = {
       deductedBatches.push({ batchId: batch._id, batchNo: batch.batchNo, qty: deductAmount });
 
       const movement = new StockMovement({
+        orgId,
         factoryId,
         itemId,
         batchId: batch._id,
@@ -81,18 +91,21 @@ export const inventoryService = {
     if (item) {
       const currentStock = availableBatches.reduce((acc, b) => acc + b.qty, 0) - qty;
       if (currentStock <= item.reorderLevel) {
-        eventBus.emit(EVENTS.LOW_STOCK_ALERT, { itemId, itemName: item.name, currentStock, reorderLevel: item.reorderLevel });
-        getIO().emit('inventory:low-stock', { itemId, itemName: item.name, currentStock, reorderLevel: item.reorderLevel });
+        eventBus.emit(EVENTS.LOW_STOCK_ALERT, { orgId, itemId, itemName: item.name, currentStock, reorderLevel: item.reorderLevel });
+        getIO().emit('inventory:low-stock', { orgId, itemId, itemName: item.name, currentStock, reorderLevel: item.reorderLevel });
       }
     }
 
-    eventBus.emit(EVENTS.STOCK_OUT, { itemId, qty, refType, refId, deductedBatches });
+    eventBus.emit(EVENTS.STOCK_OUT, { orgId, itemId, qty, refType, refId, deductedBatches });
     return deductedBatches;
   },
 
-  async getInventorySummary() {
-    const items = await Item.find({ isActive: true });
-    const batches = await StockBatch.find({ qty: { $gt: 0 } }).populate('itemId');
+  async getInventorySummary(req) {
+    const itemFilter = getTenantQuery(req, { isActive: true });
+    const batchFilter = getTenantQuery(req, { qty: { $gt: 0 } });
+
+    const items = await Item.find(itemFilter);
+    const batches = await StockBatch.find(batchFilter).populate('itemId');
     
     const summary = items.map((item) => {
       const itemBatches = batches.filter((b) => b.itemId && b.itemId._id.toString() === item._id.toString());

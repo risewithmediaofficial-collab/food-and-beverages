@@ -6,10 +6,11 @@ import { eventBus, EVENTS } from '../../common/events/eventBus.js';
 import { getIO } from '../../config/socket.js';
 
 export const qualityService = {
-  async processQCDecision(qcCheckId, { overallResult, notes, userId, parameters }) {
+  async processQCDecision(qcCheckId, { overallResult, notes, userId, parameters, orgId }) {
     const qcCheck = await QCCheck.findById(qcCheckId);
     if (!qcCheck) throw new Error('QC Check not found');
 
+    const effectiveOrgId = orgId || qcCheck.orgId;
     qcCheck.overallResult = overallResult;
     if (notes) qcCheck.notes = notes;
     if (userId) qcCheck.checkedBy = userId;
@@ -26,10 +27,10 @@ export const qualityService = {
         ? 'Rework / Quarantined'
         : 'Quarantined';
 
-      await Batch.updateMany(
-        { $or: [{ batchCode: qcCheck.batchId }, { batchNo: qcCheck.batchId }] },
-        { qcStatus: batchStatus }
-      );
+      const batchFilter = { $or: [{ batchCode: qcCheck.batchId }, { batchNo: qcCheck.batchId }] };
+      if (effectiveOrgId) batchFilter.orgId = effectiveOrgId;
+
+      await Batch.updateMany(batchFilter, { qcStatus: batchStatus });
     } catch (e) {
       console.warn('[QualityService] Could not update Batch record:', e.message);
     }
@@ -48,6 +49,7 @@ export const qualityService = {
           }
 
           await inventoryService.stockIn({
+            orgId: effectiveOrgId || order.orgId,
             factoryId: order.factoryId,
             itemId: order.productId,
             batchNo: order.batchId,
@@ -59,9 +61,13 @@ export const qualityService = {
             expiryDate: new Date(Date.now() + (90 * 24 * 60 * 60 * 1000)),
           });
 
-          const existingDispatch = await DispatchOrder.findOne({ productionOrderId: order._id, isActive: true });
+          const dispatchFilter = { productionOrderId: order._id, isActive: true };
+          if (effectiveOrgId) dispatchFilter.orgId = effectiveOrgId;
+          const existingDispatch = await DispatchOrder.findOne(dispatchFilter);
+
           if (!existingDispatch) {
             await DispatchOrder.create({
+              orgId: effectiveOrgId || order.orgId,
               factoryId: order.factoryId,
               dispatchNo: `DSP-${Date.now().toString().slice(-6)}`,
               productionOrderId: order._id,
@@ -88,12 +94,12 @@ export const qualityService = {
           }
         }
 
-        getIO().emit('production:order-updated', { orderId: order._id, status: order.status, batchId: order.batchId });
+        getIO().emit('production:order-updated', { orgId: effectiveOrgId, orderId: order._id, status: order.status, batchId: order.batchId });
       }
     }
 
-    eventBus.emit(EVENTS.QC_COMPLETED, { qcCheckId: qcCheck._id, batchId: qcCheck.batchId, overallResult });
-    getIO().emit('qc:batch-result', { batchId: qcCheck.batchId, result: overallResult });
+    eventBus.emit(EVENTS.QC_COMPLETED, { orgId: effectiveOrgId, qcCheckId: qcCheck._id, batchId: qcCheck.batchId, overallResult });
+    getIO().emit('qc:batch-result', { orgId: effectiveOrgId, batchId: qcCheck.batchId, result: overallResult });
 
     return qcCheck;
   }

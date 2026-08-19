@@ -1,7 +1,8 @@
 import mongoose from 'mongoose';
 
 const employeeSchema = new mongoose.Schema({
-  empId: { type: String, required: true, unique: true },
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
+  empId: { type: String, required: true },
   rfidCardNo: { type: String, default: '' },
   name: { type: String, required: true },
   username: { type: String },
@@ -24,7 +25,10 @@ const employeeSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+employeeSchema.index({ orgId: 1, empId: 1 });
+
 const rfidAttendanceLogSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   empId: { type: String, required: true },
   empName: String,
   rfidCardNo: { type: String },
@@ -42,6 +46,7 @@ const rfidAttendanceLogSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const rfidDeviceSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   deviceName: { type: String, required: true },
   deviceIp: { type: String, required: true },
   port: { type: Number, default: 4370 },
@@ -54,6 +59,7 @@ const rfidDeviceSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const shiftSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   shiftCode: { type: String, default: '' },
   shiftName: { type: String, required: true },
   startTime: { type: String, default: '08:00 AM' },
@@ -67,6 +73,7 @@ const shiftSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const leaveSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   leaveRef: { type: String, default: '' },
   empId: { type: String, required: true },
   empName: { type: String, required: true },
@@ -81,6 +88,7 @@ const leaveSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const payrollSchema = new mongoose.Schema({
+  orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   slipId: { type: String, default: '' },
   empId: { type: String, required: true },
   empName: { type: String, required: true },

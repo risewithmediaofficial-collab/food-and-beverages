@@ -1,5 +1,6 @@
 import express from 'express';
 import { Ledger, Expense } from './finance.model.js';
+import { getTenantQuery, attachTenantOrgId } from '../../common/utils/tenantScope.js';
 
 const router = express.Router();
 
@@ -7,7 +8,7 @@ const router = express.Router();
 
 router.get('/ledgers', async (req, res) => {
   try {
-    const ledgers = await Ledger.find({ isActive: true }).sort({ date: -1 });
+    const ledgers = await Ledger.find(getTenantQuery(req, { isActive: true })).sort({ date: -1 });
     res.json({ success: true, data: ledgers });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -16,7 +17,7 @@ router.get('/ledgers', async (req, res) => {
 
 router.post('/ledgers', async (req, res) => {
   try {
-    const entry = new Ledger(req.body);
+    const entry = new Ledger(attachTenantOrgId(req, req.body));
     await entry.save();
     res.status(201).json({ success: true, data: entry });
   } catch (err) {
@@ -26,7 +27,7 @@ router.post('/ledgers', async (req, res) => {
 
 router.put('/ledgers/:id', async (req, res) => {
   try {
-    const entry = await Ledger.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const entry = await Ledger.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     if (!entry) return res.status(404).json({ success: false, message: 'Ledger entry not found' });
     res.json({ success: true, data: entry });
   } catch (err) {
@@ -36,7 +37,7 @@ router.put('/ledgers/:id', async (req, res) => {
 
 router.delete('/ledgers/:id', async (req, res) => {
   try {
-    const entry = await Ledger.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    const entry = await Ledger.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), { isActive: false }, { new: true });
     if (!entry) return res.status(404).json({ success: false, message: 'Ledger entry not found' });
     res.json({ success: true, message: 'Ledger entry deleted successfully' });
   } catch (err) {
@@ -48,7 +49,7 @@ router.delete('/ledgers/:id', async (req, res) => {
 
 router.get('/expenses', async (req, res) => {
   try {
-    const expenses = await Expense.find({ isActive: true }).sort({ createdAt: -1 });
+    const expenses = await Expense.find(getTenantQuery(req, { isActive: true })).sort({ createdAt: -1 });
     res.json({ success: true, data: expenses });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -57,7 +58,7 @@ router.get('/expenses', async (req, res) => {
 
 router.post('/expenses', async (req, res) => {
   try {
-    const expense = new Expense(req.body);
+    const expense = new Expense(attachTenantOrgId(req, req.body));
     await expense.save();
     res.status(201).json({ success: true, data: expense });
   } catch (err) {
@@ -67,7 +68,7 @@ router.post('/expenses', async (req, res) => {
 
 router.put('/expenses/:id', async (req, res) => {
   try {
-    const expense = await Expense.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const expense = await Expense.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     if (!expense) return res.status(404).json({ success: false, message: 'Expense not found' });
     res.json({ success: true, data: expense });
   } catch (err) {
@@ -77,7 +78,7 @@ router.put('/expenses/:id', async (req, res) => {
 
 router.delete('/expenses/:id', async (req, res) => {
   try {
-    const expense = await Expense.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    const expense = await Expense.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), { isActive: false }, { new: true });
     if (!expense) return res.status(404).json({ success: false, message: 'Expense not found' });
     res.json({ success: true, message: 'Expense deleted successfully' });
   } catch (err) {

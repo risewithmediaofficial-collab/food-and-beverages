@@ -3,15 +3,16 @@ import bcrypt from 'bcryptjs';
 import { Employee, RFIDAttendanceLog, RFIDDevice, Shift, Leave, Payroll } from './hr.model.js';
 import { User } from '../auth/auth.model.js';
 import { resolveRoleAccess } from '../auth/auth.routes.js';
+import { getTenantQuery, attachTenantOrgId } from '../../common/utils/tenantScope.js';
 
 const router = express.Router();
 
 // 1. Employee Master CRUD
 
-// Delete ALL employees (Clear database)
+// Delete ALL employees for organization
 router.delete('/employees/all', async (req, res) => {
   try {
-    await Employee.deleteMany({});
+    await Employee.deleteMany(getTenantQuery(req, {}));
     res.json({ success: true, message: 'All employees deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -20,7 +21,7 @@ router.delete('/employees/all', async (req, res) => {
 
 router.get('/employees', async (req, res) => {
   try {
-    const employees = await Employee.find({ isActive: true }).select('-password').sort({ createdAt: -1 });
+    const employees = await Employee.find(getTenantQuery(req, { isActive: true })).select('-password').sort({ createdAt: -1 });
     res.json({ success: true, data: employees });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -31,9 +32,9 @@ router.post('/employees', async (req, res) => {
   try {
     const { empId, name, username, password, email, designation, department, shift, rfidCardNo, phone, basicSalary, status } = req.body;
     const loginPassword = password || `Jf@${Math.floor(100000 + Math.random() * 900000)}`;
-    const roleAccess = await resolveRoleAccess(designation || 'Employee', req.user?.orgId || null);
+    const roleAccess = await resolveRoleAccess(designation || 'Employee', req.orgId || req.user?.orgId || null);
 
-    const empData = {
+    const empData = attachTenantOrgId(req, {
       empId: empId || `EMP-${Date.now().toString().slice(-4)}`,
       name,
       username: username || email || name.toLowerCase().replace(/\s+/g, '') + '@juice-erp.com',
@@ -45,7 +46,7 @@ router.post('/employees', async (req, res) => {
       phone: phone || '',
       basicSalary: basicSalary || 25000,
       status: status || 'Active',
-    };
+    });
 
     const emp = new Employee(empData);
     await emp.save();
@@ -65,7 +66,7 @@ router.post('/employees', async (req, res) => {
           role: roleAccess.roleName,
           permissions: roleAccess.permissions,
           empId: empData.empId,
-          orgId: req.user?.orgId || null,
+          orgId: req.orgId || req.user?.orgId || null,
           status: 'Active',
           isActive: true,
         });
@@ -87,7 +88,7 @@ router.put('/employees/:id', async (req, res) => {
     const { name, username, email, designation, department, shift, phone, basicSalary, status, rfidCardNo, password } = req.body;
     let roleAccess = null;
     if (designation) {
-      roleAccess = await resolveRoleAccess(designation, req.user?.orgId || null);
+      roleAccess = await resolveRoleAccess(designation, req.orgId || req.user?.orgId || null);
     }
 
     const updateFields = {
@@ -103,7 +104,7 @@ router.put('/employees/:id', async (req, res) => {
       ...(rfidCardNo !== undefined && { rfidCardNo }),
     };
 
-    const updated = await Employee.findByIdAndUpdate(req.params.id, updateFields, { new: true });
+    const updated = await Employee.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), updateFields, { new: true });
     if (!updated) return res.status(404).json({ success: false, message: 'Employee not found' });
 
     // Sync with User login account if present
@@ -138,7 +139,7 @@ router.put('/employees/:id', async (req, res) => {
 
 router.delete('/employees/:id', async (req, res) => {
   try {
-    await Employee.findByIdAndDelete(req.params.id);
+    await Employee.findOneAndDelete(getTenantQuery(req, { _id: req.params.id }));
     res.json({ success: true, message: 'Employee deleted successfully' });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -148,7 +149,7 @@ router.delete('/employees/:id', async (req, res) => {
 // 2. RFID Attendance Logs & Punch In/Out API
 router.get('/attendance/logs', async (req, res) => {
   try {
-    const logs = await RFIDAttendanceLog.find().sort({ punchDate: -1 }).limit(100);
+    const logs = await RFIDAttendanceLog.find(getTenantQuery(req, {})).sort({ punchDate: -1 }).limit(100);
     res.json({ success: true, data: logs });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -158,13 +159,13 @@ router.get('/attendance/logs', async (req, res) => {
 router.post('/attendance/punch', async (req, res) => {
   try {
     const { empId, rfidCardNo, punchType, deviceName, deviceIp } = req.body;
-    let emp = await Employee.findOne({ rfidCardNo });
-    if (!emp && empId) emp = await Employee.findOne({ empId });
+    let emp = await Employee.findOne(getTenantQuery(req, { rfidCardNo }));
+    if (!emp && empId) emp = await Employee.findOne(getTenantQuery(req, { empId }));
 
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    const punchRecord = new RFIDAttendanceLog({
+    const punchRecord = new RFIDAttendanceLog(attachTenantOrgId(req, {
       empId: emp ? emp.empId : (empId || 'EMP-GUEST'),
       empName: emp ? emp.name : 'Guest Worker',
       rfidCardNo: rfidCardNo || (emp ? emp.rfidCardNo : 'RF-UNKNOWN'),
@@ -174,7 +175,7 @@ router.post('/attendance/punch', async (req, res) => {
       deviceName: deviceName || 'ZKTeco-Main-Gate',
       deviceIp: deviceIp || '192.168.1.150',
       status: 'Present',
-    });
+    }));
 
     await punchRecord.save();
     res.status(201).json({ success: true, data: punchRecord });
@@ -186,7 +187,7 @@ router.post('/attendance/punch', async (req, res) => {
 // 3. RFID Device Master
 router.get('/devices', async (req, res) => {
   try {
-    const devices = await RFIDDevice.find({ isActive: true });
+    const devices = await RFIDDevice.find(getTenantQuery(req, { isActive: true }));
     res.json({ success: true, data: devices });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -195,7 +196,7 @@ router.get('/devices', async (req, res) => {
 
 router.post('/devices', async (req, res) => {
   try {
-    const device = new RFIDDevice(req.body);
+    const device = new RFIDDevice(attachTenantOrgId(req, req.body));
     await device.save();
     res.status(201).json({ success: true, data: device });
   } catch (err) {
@@ -205,7 +206,7 @@ router.post('/devices', async (req, res) => {
 
 router.put('/devices/:id', async (req, res) => {
   try {
-    const device = await RFIDDevice.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const device = await RFIDDevice.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     if (!device) return res.status(404).json({ success: false, message: 'Device not found' });
     res.json({ success: true, data: device });
   } catch (err) {
@@ -215,7 +216,7 @@ router.put('/devices/:id', async (req, res) => {
 
 router.delete('/devices/:id', async (req, res) => {
   try {
-    await RFIDDevice.findByIdAndDelete(req.params.id);
+    await RFIDDevice.findOneAndDelete(getTenantQuery(req, { _id: req.params.id }));
     res.json({ success: true, message: 'Device removed' });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -225,7 +226,7 @@ router.delete('/devices/:id', async (req, res) => {
 // 4. Shift Management CRUD
 router.get('/shifts', async (req, res) => {
   try {
-    const shifts = await Shift.find().sort({ createdAt: -1 });
+    const shifts = await Shift.find(getTenantQuery(req, {})).sort({ createdAt: -1 });
     res.json({ success: true, data: shifts });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -234,7 +235,7 @@ router.get('/shifts', async (req, res) => {
 
 router.post('/shifts', async (req, res) => {
   try {
-    const shift = new Shift(req.body);
+    const shift = new Shift(attachTenantOrgId(req, req.body));
     await shift.save();
     res.status(201).json({ success: true, data: shift });
   } catch (err) {
@@ -244,7 +245,7 @@ router.post('/shifts', async (req, res) => {
 
 router.put('/shifts/:id', async (req, res) => {
   try {
-    const shift = await Shift.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const shift = await Shift.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     if (!shift) return res.status(404).json({ success: false, message: 'Shift not found' });
     res.json({ success: true, data: shift });
   } catch (err) {
@@ -254,7 +255,7 @@ router.put('/shifts/:id', async (req, res) => {
 
 router.delete('/shifts/:id', async (req, res) => {
   try {
-    await Shift.findByIdAndDelete(req.params.id);
+    await Shift.findOneAndDelete(getTenantQuery(req, { _id: req.params.id }));
     res.json({ success: true, message: 'Shift deleted' });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -264,7 +265,7 @@ router.delete('/shifts/:id', async (req, res) => {
 // 5. Leave Management CRUD
 router.get('/leaves', async (req, res) => {
   try {
-    const leaves = await Leave.find().sort({ createdAt: -1 });
+    const leaves = await Leave.find(getTenantQuery(req, {})).sort({ createdAt: -1 });
     res.json({ success: true, data: leaves });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -273,13 +274,13 @@ router.get('/leaves', async (req, res) => {
 
 router.post('/leaves', async (req, res) => {
   try {
-    const count = await Leave.countDocuments();
-    const leave = new Leave({
+    const count = await Leave.countDocuments(getTenantQuery(req, {}));
+    const leave = new Leave(attachTenantOrgId(req, {
       leaveRef: `LEV-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`,
       ...req.body,
       status: 'Pending',
       approvedBy: 'Pending Review',
-    });
+    }));
     await leave.save();
     res.status(201).json({ success: true, data: leave });
   } catch (err) {
@@ -289,7 +290,7 @@ router.post('/leaves', async (req, res) => {
 
 router.put('/leaves/:id', async (req, res) => {
   try {
-    const leave = await Leave.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const leave = await Leave.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     if (!leave) return res.status(404).json({ success: false, message: 'Leave not found' });
     res.json({ success: true, data: leave });
   } catch (err) {
@@ -299,7 +300,7 @@ router.put('/leaves/:id', async (req, res) => {
 
 router.delete('/leaves/:id', async (req, res) => {
   try {
-    await Leave.findByIdAndDelete(req.params.id);
+    await Leave.findOneAndDelete(getTenantQuery(req, { _id: req.params.id }));
     res.json({ success: true, message: 'Leave deleted' });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -309,7 +310,7 @@ router.delete('/leaves/:id', async (req, res) => {
 // 6. Payroll CRUD
 router.get('/payroll', async (req, res) => {
   try {
-    const payroll = await Payroll.find().sort({ createdAt: -1 });
+    const payroll = await Payroll.find(getTenantQuery(req, {})).sort({ createdAt: -1 });
     res.json({ success: true, data: payroll });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -321,7 +322,7 @@ router.post('/payroll', async (req, res) => {
     const { basicPay = 0, hra = 0, overtimePay = 0, pfDeduction = 0, esiDeduction = 0, lateDeduction = 0 } = req.body;
     const netSalary = Number(basicPay) + Number(hra) + Number(overtimePay) - (Number(pfDeduction) + Number(esiDeduction) + Number(lateDeduction));
     const slipId = `PAY-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const payroll = new Payroll({ slipId, ...req.body, netSalary });
+    const payroll = new Payroll(attachTenantOrgId(req, { slipId, ...req.body, netSalary }));
     await payroll.save();
     res.status(201).json({ success: true, data: payroll });
   } catch (err) {
@@ -331,7 +332,7 @@ router.post('/payroll', async (req, res) => {
 
 router.put('/payroll/:id', async (req, res) => {
   try {
-    const payroll = await Payroll.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const payroll = await Payroll.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
     if (!payroll) return res.status(404).json({ success: false, message: 'Payroll record not found' });
     res.json({ success: true, data: payroll });
   } catch (err) {
@@ -341,7 +342,7 @@ router.put('/payroll/:id', async (req, res) => {
 
 router.delete('/payroll/:id', async (req, res) => {
   try {
-    await Payroll.findByIdAndDelete(req.params.id);
+    await Payroll.findOneAndDelete(getTenantQuery(req, { _id: req.params.id }));
     res.json({ success: true, message: 'Payroll record deleted' });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
