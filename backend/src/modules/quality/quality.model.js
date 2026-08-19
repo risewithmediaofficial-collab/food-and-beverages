@@ -37,18 +37,40 @@ const qcCheckSchema = new mongoose.Schema({
 
 qcCheckSchema.index({ orgId: 1, checkNo: 1 });
 
+const labTestSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  standardSpec: String,
+  measuredValue: String,
+  unit: String,
+  result: { type: String, enum: ['PASS', 'FAIL', 'PENDING'], default: 'PASS' },
+});
+
 const labSampleSchema = new mongoose.Schema({
   orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
   factoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Factory' },
+  sampleId: { type: String, required: true },
   batchId: { type: String, required: true },
-  tests: [{
-    name: String,
-    result: String,
-    certificateUrl: String,
-    testedAt: { type: Date, default: Date.now },
-  }],
+  orderNo: String,
+  productName: { type: String, default: 'Juice Bottle (500ml)' },
+  qtyPlanned: { type: Number, default: 1000 },
+  unit: { type: String, default: 'Bottles' },
+  chemistName: { type: String, default: 'QC Chemist' },
+  tests: [labTestSchema],
+  coaNumber: String,
+  coaIssuedAt: Date,
+  status: {
+    type: String,
+    enum: ['pending', 'in_testing', 'cleared', 'rejected'],
+    default: 'pending',
+  },
+  notes: String,
+  qcCheckId: { type: mongoose.Schema.Types.ObjectId, ref: 'QCCheck' },
+  productionOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductionOrder' },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
+
+labSampleSchema.index({ orgId: 1, sampleId: 1 });
+labSampleSchema.index({ orgId: 1, batchId: 1 });
 
 export const QCCheck = mongoose.models.QCCheck || mongoose.model('QCCheck', qcCheckSchema);
 export const LabSample = mongoose.models.LabSample || mongoose.model('LabSample', labSampleSchema);

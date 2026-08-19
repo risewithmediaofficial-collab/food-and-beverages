@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { socket } from '../../lib/socket';
 import { Icon } from '@iconify/react';
 import ExportDataToolbar from '../../components/ExportDataToolbar';
+import ManufacturingPipelineBar from '../../components/ManufacturingPipelineBar';
 
 export default function QualityPanel({ triggerInfo }) {
+  const navigate = useNavigate();
   const [checks, setChecks] = useState([]);
   const [orders, setOrders] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
@@ -217,6 +220,8 @@ export default function QualityPanel({ triggerInfo }) {
 
   return (
     <div className="space-y-6 font-sans">
+      <ManufacturingPipelineBar currentStage="quality" />
+
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
         <div>
@@ -418,10 +423,18 @@ export default function QualityPanel({ triggerInfo }) {
                       </button>
 
                       <button
-                        onClick={() => handleDecision(c._id, 'approved')}
+                        onClick={() => handleDecision(c._id, 'approved', 'QC Approved! Batch forwarded to Quality Laboratory for microbiological testing & COA clearance.')}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-4 py-2 rounded-xl font-extrabold flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition cursor-pointer"
+                        title="Pass physical QC parameters and send batch to Laboratory"
                       >
-                        <Icon icon="mdi:check-decagram" className="text-base" /> Approve & Schedule Dispatch
+                        <Icon icon="mdi:microscope" className="text-base" /> 🧪 Approve QC & Send to Laboratory Test
+                      </button>
+                      <button
+                        onClick={() => navigate('/laboratory')}
+                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs px-3 py-2 rounded-xl font-bold flex items-center gap-1 cursor-pointer"
+                        title="Open Quality Laboratory"
+                      >
+                        <Icon icon="mdi:arrow-right" className="text-base" /> Open Lab
                       </button>
                     </div>
                   </div>

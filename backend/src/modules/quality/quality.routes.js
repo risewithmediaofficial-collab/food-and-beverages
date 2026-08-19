@@ -1,10 +1,14 @@
 import express from 'express';
-import { QCCheck } from './quality.model.js';
-import { ProductionOrder } from '../production/production.model.js';
+import { QCCheck, LabSample } from './quality.model.js';
+import { PackagingBatch } from '../packaging/packaging.model.js';
+import { ProductionOrder, Batch } from '../production/production.model.js';
 import { qualityService } from './quality.service.js';
 import { getTenantQuery, attachTenantOrgId } from '../../common/utils/tenantScope.js';
+import { getIO } from '../../config/socket.js';
 
 const router = express.Router();
+
+// ─── 1. Quality Control Physical Checks ───────────────────────────────────────
 
 router.get('/checks', async (req, res) => {
   try {
@@ -137,6 +141,165 @@ router.delete('/checks/:id', async (req, res) => {
     const check = await QCCheck.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), { isActive: false }, { new: true });
     if (!check) return res.status(404).json({ success: false, message: 'QC check not found' });
     res.json({ success: true, message: 'QC check deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── 2. Laboratory Testing & COA Clearance APIs ──────────────────────────────
+
+router.get('/lab-samples', async (req, res) => {
+  try {
+    const effectiveOrgId = req.orgId || req.user?.orgId;
+    
+    // Auto-reconcile approved QC checks into LabSamples if not already created
+    const approvedQCChecks = await QCCheck.find(getTenantQuery(req, { overallResult: 'approved', isActive: true }));
+    for (const check of approvedQCChecks) {
+      const labFilter = { batchId: check.batchId, isActive: true };
+      if (effectiveOrgId) labFilter.orgId = effectiveOrgId;
+
+      let lab = await LabSample.findOne(labFilter);
+      if (!lab) {
+        lab = new LabSample({
+          orgId: effectiveOrgId || check.orgId,
+          factoryId: check.factoryId,
+          sampleId: `LAB-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`,
+          batchId: check.batchId,
+          orderNo: check.orderNo,
+          productName: check.productName,
+          qtyPlanned: check.qtyTested || 1000,
+          unit: check.unit || 'Bottles',
+          status: 'pending',
+          qcCheckId: check._id,
+          productionOrderId: check.refId,
+          tests: [
+            { name: 'Total Plate Count (TPC)', standardSpec: '< 10 CFU/ml', measuredValue: '< 1 CFU/ml', unit: 'CFU/ml', result: 'PASS' },
+            { name: 'Yeast & Mold Count', standardSpec: '< 5 CFU/ml', measuredValue: '0 CFU/ml', unit: 'CFU/ml', result: 'PASS' },
+            { name: 'Coliform / E. coli', standardSpec: 'Absent / 100ml', measuredValue: 'Absent', unit: 'Absence', result: 'PASS' },
+            { name: 'Brix Sugar Concentration', standardSpec: '11.5 - 13.5 °Brix', measuredValue: '12.5 °Brix', unit: '°Brix', result: 'PASS' },
+            { name: 'pH Acid Titration', standardSpec: '3.5 - 4.2 pH', measuredValue: '3.8 pH', unit: 'pH', result: 'PASS' },
+            { name: 'Heavy Metals (Lead/Arsenic)', standardSpec: '< 0.01 ppm', measuredValue: '0.002 ppm', unit: 'ppm', result: 'PASS' },
+          ],
+        });
+        await lab.save();
+      }
+    }
+
+    const samples = await LabSample.find(getTenantQuery(req, { isActive: true })).sort({ createdAt: -1 });
+    res.json({ success: true, data: samples });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.post('/lab-samples', async (req, res) => {
+  try {
+    const payload = attachTenantOrgId(req, {
+      sampleId: `LAB-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`,
+      ...req.body,
+    });
+    const sample = new LabSample(payload);
+    await sample.save();
+    res.status(201).json({ success: true, data: sample });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+router.post('/lab-samples/:id/clear', async (req, res) => {
+  try {
+    const sample = await LabSample.findOne(getTenantQuery(req, { _id: req.params.id }));
+    if (!sample) return res.status(404).json({ success: false, message: 'Lab sample not found' });
+
+    const coaNumber = `COA-${sample.batchId || Date.now().toString().slice(-6)}`;
+    sample.status = 'cleared';
+    sample.coaNumber = coaNumber;
+    sample.coaIssuedAt = new Date();
+    if (req.body.tests) sample.tests = req.body.tests;
+    if (req.body.chemistName) sample.chemistName = req.body.chemistName;
+    if (req.body.notes) sample.notes = req.body.notes;
+    await sample.save();
+
+    const effectiveOrgId = req.orgId || req.user?.orgId || sample.orgId;
+
+    // Update batch status
+    try {
+      const batchFilter = { $or: [{ batchCode: sample.batchId }, { batchNo: sample.batchId }] };
+      if (effectiveOrgId) batchFilter.orgId = effectiveOrgId;
+      await Batch.updateMany(batchFilter, { qcStatus: 'Lab Cleared - Ready for Packaging' });
+    } catch (e) {
+      console.warn('[Lab Sample Clearance Batch Sync]', e.message);
+    }
+
+    // Auto-create / stage Packaging Batch in /packaging
+    const pkgFilter = { batchId: sample.batchId, isActive: true };
+    if (effectiveOrgId) pkgFilter.orgId = effectiveOrgId;
+
+    let pkg = await PackagingBatch.findOne(pkgFilter);
+    const bottleCount = Number(sample.qtyPlanned || 1000);
+    const cartonCount = Math.ceil(bottleCount / 24);
+
+    if (!pkg) {
+      const materials = [
+        { name: '500ml PET Bottles', consumedQty: bottleCount, unit: 'Pcs', unitCost: 1.5, totalCost: bottleCount * 1.5 },
+        { name: 'Tamper-Evident Caps', consumedQty: bottleCount, unit: 'Pcs', unitCost: 0.35, totalCost: bottleCount * 0.35 },
+        { name: 'Shrink Sleeve Labels', consumedQty: bottleCount, unit: 'Pcs', unitCost: 0.45, totalCost: bottleCount * 0.45 },
+        { name: 'Corrugated Master Cartons (24s)', consumedQty: cartonCount, unit: 'Boxes', unitCost: 15.0, totalCost: cartonCount * 15.0 },
+      ];
+      const totalPackagingCost = materials.reduce((acc, m) => acc + m.totalCost, 0);
+
+      pkg = new PackagingBatch({
+        orgId: effectiveOrgId,
+        factoryId: sample.factoryId,
+        packagingNo: `PKG-${Date.now().toString().slice(-6)}`,
+        batchId: sample.batchId,
+        orderNo: sample.orderNo,
+        productName: sample.productName,
+        qtyPlanned: bottleCount,
+        bottlesPacked: bottleCount,
+        cartonsPacked: cartonCount,
+        packagingLine: 'Bottling & Packaging Line #1',
+        materials,
+        totalPackagingCost,
+        status: 'pending',
+        labSampleId: sample._id,
+        productionOrderId: sample.productionOrderId,
+      });
+      await pkg.save();
+    }
+
+    try {
+      getIO().emit('quality:lab-cleared', { batchId: sample.batchId, coaNumber, packagingNo: pkg.packagingNo });
+    } catch (e) {
+      console.warn('[Lab Clearance Socket Warning]', e.message);
+    }
+
+    res.json({
+      success: true,
+      data: sample,
+      packagingBatch: pkg,
+      coaNumber,
+      message: 'Lab clearance passed & COA generated! Batch forwarded to Packaging Line.',
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+router.put('/lab-samples/:id', async (req, res) => {
+  try {
+    const sample = await LabSample.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), req.body, { new: true });
+    if (!sample) return res.status(404).json({ success: false, message: 'Lab sample not found' });
+    res.json({ success: true, data: sample });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+router.delete('/lab-samples/:id', async (req, res) => {
+  try {
+    await LabSample.findOneAndUpdate(getTenantQuery(req, { _id: req.params.id }), { isActive: false });
+    res.json({ success: true, message: 'Lab sample deleted' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

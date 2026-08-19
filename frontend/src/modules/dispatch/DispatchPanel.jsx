@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import ExportDataToolbar from '../../components/ExportDataToolbar';
+import ManufacturingPipelineBar from '../../components/ManufacturingPipelineBar';
 import { api } from '../../lib/api';
 
 export default function DispatchPanel({ user, triggerError }) {
   const [dispatches, setDispatches] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [packagingBatches, setPackagingBatches] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -29,9 +31,10 @@ export default function DispatchPanel({ user, triggerError }) {
   const fetchDispatches = async () => {
     try {
       setLoading(true);
-      const [res, orderRes] = await Promise.all([
+      const [res, orderRes, pkgRes] = await Promise.all([
         api.get('/dispatch/records'),
         api.get('/production/orders'),
+        api.get('/packaging/batches'),
       ]);
       if (res.success && Array.isArray(res.data)) {
         setDispatches(res.data);
@@ -40,6 +43,9 @@ export default function DispatchPanel({ user, triggerError }) {
       }
       if (orderRes.success && Array.isArray(orderRes.data)) {
         setOrders(orderRes.data);
+      }
+      if (pkgRes.success && Array.isArray(pkgRes.data)) {
+        setPackagingBatches(pkgRes.data);
       }
     } catch (err) {
       console.warn('Failed to load dispatch orders:', err);
@@ -52,6 +58,21 @@ export default function DispatchPanel({ user, triggerError }) {
   const handleSelectOrder = (orderId) => {
     setSelectedOrderId(orderId);
     if (!orderId) return;
+
+    // Check in packaging batches first
+    const pkg = packagingBatches.find((p) => p._id === orderId || p.packagingNo === orderId || p.batchId === orderId);
+    if (pkg) {
+      const bottleQty = pkg.bottlesPacked || pkg.qtyPlanned || 5000;
+      const cartonQty = pkg.cartonsPacked || Math.ceil(bottleQty / 24);
+      setFormData({
+        ...formData,
+        orderNo: pkg.orderNo || `ORD-${pkg.packagingNo.slice(-5)}`,
+        batchId: pkg.batchId || '',
+        qtyLoaded: `${bottleQty.toLocaleString()} Bottles (${cartonQty} Master Cartons) - ${pkg.productName}`,
+      });
+      return;
+    }
+
     const ord = orders.find((o) => o._id === orderId || o.orderNo === orderId);
     if (ord) {
       setFormData({
@@ -68,23 +89,16 @@ export default function DispatchPanel({ user, triggerError }) {
     try {
       setLoading(true);
       const payload = {
-        dispatchNo: formData.id || `DSP-2026-10${dispatches.length + 1}`,
-        id: formData.id || `DSP-2026-10${dispatches.length + 1}`,
-        vehicleNo: formData.vehicleNo,
-        driverName: formData.driverName,
-        destination: formData.destination,
-        orderNo: formData.orderNo,
-        batchId: formData.batchId || formData.orderNo || formData.id,
-        qtyLoaded: formData.qtyLoaded,
-        status: formData.status,
-        gpsLocation: formData.gpsLocation,
+        ...formData,
+        id: formData.id || `DSP-${Date.now().toString().slice(-6)}`,
       };
       const res = await api.post('/dispatch/records', payload);
       if (res.success && res.data) {
         setDispatches([res.data, ...dispatches]);
         setShowAddModal(false);
-        setFormData({ id: '', vehicleNo: '', driverName: '', destination: '', orderNo: '', batchId: '', qtyLoaded: '', status: 'In Transit', gpsLocation: '' });
-        if (triggerError) triggerError('Dispatch delivery order created!', 'success');
+        setFormData({ id: `DSP-2026-10${dispatches.length + 2}`, vehicleNo: 'MH-15-EG-4521', driverName: 'Ramesh Patil', destination: '', orderNo: 'SO-2026-001', batchId: '', qtyLoaded: '5,000 Bottles', status: 'In Transit', gpsLocation: 'Expressway In-Transit' });
+        setSelectedOrderId('');
+        if (triggerError) triggerError('Dispatch delivery order created successfully!', 'success');
       } else {
         throw new Error(res.message || 'Failed to create dispatch order');
       }
@@ -116,7 +130,7 @@ export default function DispatchPanel({ user, triggerError }) {
   };
 
   const handleDeleteDsp = async (id) => {
-    if (!window.confirm('Delete this dispatch order?')) return;
+    if (!window.confirm('Delete this dispatch record?')) return;
     try {
       setLoading(true);
       await api.delete(`/dispatch/records/${id}`);
@@ -146,6 +160,8 @@ export default function DispatchPanel({ user, triggerError }) {
 
   return (
     <div className="space-y-6 font-sans">
+      <ManufacturingPipelineBar currentStage="dispatch" />
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -175,29 +191,42 @@ export default function DispatchPanel({ user, triggerError }) {
               <Icon icon="mdi:truck-delivery-outline" className="text-orange-500 text-base" />
               {editingDsp ? `Edit Dispatch Order (${editingDsp.id || editingDsp.dispatchNo})` : 'Create New Dispatch Order'}
             </h3>
-            <button type="button" onClick={() => { setShowAddModal(false); setEditingDsp(null); }} className="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+            <button type="button" onClick={() => { setShowAddModal(false); setEditingDsp(null); }} className="text-slate-400 hover:text-slate-600 text-sm cursor-pointer">✕</button>
           </div>
 
           {!editingDsp && (
             <div className="bg-orange-50/60 border border-orange-100 p-3 rounded-xl">
               <label className="text-xs font-bold text-orange-900 block mb-1">
-                Select Production Order for Dispatch (Auto-fill)
+                Select Packaged Batch / Production Order for Dispatch (Auto-fill)
               </label>
               <select
                 value={selectedOrderId}
                 onChange={(e) => handleSelectOrder(e.target.value)}
                 className="w-full bg-white border border-orange-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-orange-200"
               >
-                <option value="">-- Manual Entry (Or select a Production Order below) --</option>
-                {orders.map((o) => (
-                  <option key={o._id} value={o._id}>
-                    [{o.orderNo || 'PO'}] Batch {o.batchId} - {o.productName} ({o.qtyProduced || o.qtyPlanned} {o.unit || 'Units'})
-                  </option>
-                ))}
+                <option value="">-- Manual Entry (Or select a Staged Batch below) --</option>
+                {packagingBatches.length > 0 && (
+                  <optgroup label="📦 Packaged Batches (Ready for Delivery)">
+                    {packagingBatches.map((p) => (
+                      <option key={p._id} value={p._id}>
+                        [{p.packagingNo}] Batch {p.batchId} - {p.productName} ({p.bottlesPacked || p.qtyPlanned} Bottles / {p.cartonsPacked || Math.ceil((p.bottlesPacked || 5000)/24)} Cartons)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {orders.length > 0 && (
+                  <optgroup label="🏭 Production Orders">
+                    {orders.map((o) => (
+                      <option key={o._id} value={o._id}>
+                        [{o.orderNo || 'PO'}] Batch {o.batchId} - {o.productName} ({o.qtyProduced || o.qtyPlanned} {o.unit || 'Units'})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               {selectedOrderId && (
                 <span className="text-[10px] text-orange-700 block mt-1 font-semibold">
-                  ✓ Auto-filled order ref & loaded quantity from Production Order {selectedOrderId}
+                  ✓ Auto-filled order ref, batch ID & loaded quantity from selected batch.
                 </span>
               )}
             </div>

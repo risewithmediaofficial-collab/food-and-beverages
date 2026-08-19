@@ -18,6 +18,7 @@ import dispatchRoutes from './modules/dispatch/dispatch.routes.js';
 import hrRoutes from './modules/hr/hr.routes.js';
 import complianceRoutes from './modules/compliance/compliance.routes.js';
 import orgRoutes from './modules/org/org.routes.js';
+import packagingRoutes from './modules/packaging/packaging.routes.js';
 import superadminRoutes, { ensureSuperAdmin } from './modules/superadmin/superadmin.routes.js';
 
 const app = express();
@@ -65,6 +66,7 @@ app.use('/api/v1/finance', financeRoutes);
 app.use('/api/v1/dispatch', dispatchRoutes);
 app.use('/api/v1/hr', hrRoutes);
 app.use('/api/v1/compliance', complianceRoutes);
+app.use('/api/v1/packaging', packagingRoutes);
 
 app.use(errorHandler);
 

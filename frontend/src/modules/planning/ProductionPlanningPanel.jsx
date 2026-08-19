@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import ExportDataToolbar from '../../components/ExportDataToolbar';
+import ManufacturingPipelineBar from '../../components/ManufacturingPipelineBar';
 import { api } from '../../lib/api';
 
 export default function ProductionPlanningPanel({ user, triggerError }) {
@@ -161,6 +162,8 @@ export default function ProductionPlanningPanel({ user, triggerError }) {
 
   return (
     <div className="space-y-6 font-sans">
+      <ManufacturingPipelineBar currentStage="planning" />
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">

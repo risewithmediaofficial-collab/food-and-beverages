@@ -3,7 +3,7 @@ import { api } from '../../lib/api';
 import { socket } from '../../lib/socket';
 import { Icon } from '@iconify/react';
 import UnitSelector from '../../components/UnitSelector';
-
+import ManufacturingPipelineBar from '../../components/ManufacturingPipelineBar';
 import ExportDataToolbar from '../../components/ExportDataToolbar';
 
 export default function ProductionPanel({ user, triggerError }) {
@@ -197,6 +197,8 @@ export default function ProductionPanel({ user, triggerError }) {
 
   return (
     <div className="space-y-6 font-sans">
+      <ManufacturingPipelineBar currentStage="production" />
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
