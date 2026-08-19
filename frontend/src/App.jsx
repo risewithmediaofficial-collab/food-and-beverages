@@ -136,8 +136,11 @@ function App() {
         user={user}
         onLogout={handleLogout}
         onSelectOrgForInspection={(org) => {
-          localStorage.setItem('inspected_org_id', org._id);
-          setInspectedOrg(org);
+          if (org?._id) {
+            localStorage.setItem('inspected_org_id', org._id);
+          }
+          setInspectedOrg(org || { name: 'Master Enterprise Plant', planType: 'Enterprise Unlimited' });
+          navigate('/dashboard');
         }}
       />
     );
@@ -153,7 +156,10 @@ function App() {
   }
 
   if (!user) {
-    return <SuperAdminLogin onSuperAdminLoginSuccess={handleLoginSuccess} />;
+    if (location.pathname === '/superadmin' || location.pathname === '/superadmin/login') {
+      return <SuperAdminLogin onSuperAdminLoginSuccess={handleLoginSuccess} />;
+    }
+    return <LoginPanel onLoginSuccess={handleLoginSuccess} />;
   }
 
   const renderActiveModule = () => {

@@ -2,16 +2,16 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { config } from '../../config/env.js';
-import { OrgRequest, Organization } from './superadmin.model.js';
+import { OrgRequest, Organization, ALL_DEFAULT_MODULES } from './superadmin.model.js';
 import { User, Role } from '../auth/auth.model.js';
 import { DEFAULT_ROLES } from '../auth/auth.routes.js';
-import { normalizeCompanyRequestInput, canTenantLogin } from './superadmin.helpers.js';
+import { normalizeCompanyRequestInput } from './superadmin.helpers.js';
 
 const router = express.Router();
 
 const SUPER_ADMIN_EMAIL = 'superadmin@juice-erp.com';
 
-// Ensure Super Admin user exists in DB
+// Ensure Super Admin user and a default Organization exist in DB
 export const ensureSuperAdmin = async () => {
   try {
     let superAdmin = await User.findOne({ isSuperAdmin: true });
@@ -29,15 +29,82 @@ export const ensureSuperAdmin = async () => {
         status: 'Active',
         isActive: true,
       });
-      console.log('✅ Super Admin account created: superadmin@juice-erp.com / SuperAdmin@2026');
+      console.log('✅ Super Admin account initialized: superadmin@juice-erp.com / SuperAdmin@2026');
+    }
+
+    // Check if any Organization exists. If not, auto-seed default Organization & Tenant Admins
+    const orgCount = await Organization.countDocuments();
+    let defaultOrg = await Organization.findOne({ slug: 'freshpure-juices' });
+    if (!defaultOrg && orgCount === 0) {
+      defaultOrg = await Organization.create({
+        name: 'FreshPure Juices Pvt Ltd',
+        slug: 'freshpure-juices',
+        businessEmail: 'admin@juice-erp.com',
+        phone: '+91 98765 43210',
+        address: 'Plot 42, Industrial Growth Estate',
+        city: 'Nashik',
+        state: 'Maharashtra',
+        country: 'India',
+        planType: 'Enterprise Unlimited',
+        status: 'Active',
+        maxUsers: 100,
+        allowedModules: ALL_DEFAULT_MODULES,
+      });
+      console.log('✅ Default Organization created: FreshPure Juices Pvt Ltd');
+    }
+
+    if (defaultOrg) {
+      // Ensure default roles exist for default organization
+      for (const r of DEFAULT_ROLES) {
+        await Role.findOneAndUpdate(
+          { orgId: defaultOrg._id, name: r.name },
+          { $setOnInsert: { ...r, orgId: defaultOrg._id } },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+      }
+
+      // Ensure default users exist for default organization
+      const defaultUsersToSeed = [
+        { name: 'Rajesh Mehta', email: 'admin@juice-erp.com', pass: 'Admin@2026', role: 'General Manager', isOrgAdmin: true, dept: 'Executive' },
+        { name: 'Ananya Sharma', email: 'sales@juice-erp.com', pass: 'Sales@2026', role: 'Sales Lead', isOrgAdmin: false, dept: 'Sales & CRM' },
+        { name: 'Vikram Singh', email: 'production@juice-erp.com', pass: 'Prod@2026', role: 'Plant Supervisor', isOrgAdmin: false, dept: 'Production' },
+        { name: 'Sunil Rao', email: 'operator@juice-erp.com', pass: 'Oper@2026', role: 'Line Operator', isOrgAdmin: false, dept: 'Operations' },
+        { name: 'Pooja Verma', email: 'quality@juice-erp.com', pass: 'Quality@2026', role: 'Quality Inspector', isOrgAdmin: false, dept: 'Quality Assurance' },
+      ];
+
+      for (const u of defaultUsersToSeed) {
+        const existing = await User.findOne({ email: u.email });
+        if (!existing) {
+          const passHash = await bcrypt.hash(u.pass, 10);
+          const newUser = await User.create({
+            orgId: defaultOrg._id,
+            name: u.name,
+            email: u.email,
+            passwordHash: passHash,
+            isSuperAdmin: false,
+            isOrgAdmin: u.isOrgAdmin,
+            roleName: u.role,
+            role: u.role,
+            department: u.dept,
+            plant: 'Nashik Main Facility #1',
+            status: 'Active',
+            isActive: true,
+            permissions: ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS', 'ATTENDANCE', 'PRODUCTION', 'QUALITY', 'SALES', 'CRM', 'INVENTORY'],
+          });
+          if (u.isOrgAdmin && !defaultOrg.adminUserId) {
+            defaultOrg.adminUserId = newUser._id;
+            await defaultOrg.save();
+          }
+        }
+      }
     }
   } catch (err) {
-    console.warn('[SuperAdmin Warning] Could not initialize Super Admin account:', err.message);
+    console.warn('[SuperAdmin Warning] Could not initialize Super Admin account/default org:', err.message);
   }
 };
 
-// 1. PUBLIC ROUTE: Submit Demo or Plan Request
-router.post('/public/request-access', async (req, res) => {
+// Handler for public registration / demo access requests
+const handleRequestAccess = async (req, res) => {
   try {
     const normalizedPayload = normalizeCompanyRequestInput(req.body);
 
@@ -53,9 +120,14 @@ router.post('/public/request-access', async (req, res) => {
       message: 'Your organization request has been submitted successfully! Super Admin will review and approve your account shortly.',
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error('[Request Access Error]', err);
+    res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Submission failed. Please try again.' });
   }
-});
+};
+
+// 1. PUBLIC ROUTES: Submit Demo or Plan Request (support all path variants)
+router.post('/request-access', handleRequestAccess);
+router.post('/public/request-access', handleRequestAccess);
 
 // 2. SUPER ADMIN LOGIN
 router.post('/login', async (req, res) => {
@@ -116,22 +188,38 @@ router.post('/requests/:id/approve', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Request is already approved.' });
     }
 
-    // Generate unique slug
-    const baseSlug = orgReq.companyName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
-    const slug = `${baseSlug}-${Date.now().toString().slice(-4)}`;
-
-    // Create Organization
-    const planType = orgReq.selectedPlan.includes('Enterprise') ? 'Enterprise Unlimited' : orgReq.selectedPlan.includes('Growth') ? 'Growth Plan' : 'Free Demo';
     if (!adminEmail || !adminPassword) {
       return res.status(400).json({ success: false, message: 'Admin email and password are required.' });
     }
 
     const normalizedAdminEmail = String(adminEmail).trim().toLowerCase();
-    const exists = await User.findOne({ email: normalizedAdminEmail });
-    if (exists) {
-      await Organization.findByIdAndDelete(org._id).catch(() => null);
-      return res.status(409).json({ success: false, message: 'That admin email already exists. Please choose another email.' });
+    const existingUser = await User.findOne({ email: normalizedAdminEmail });
+    if (existingUser) {
+      return res.status(409).json({ success: false, message: 'That admin email is already registered. Please choose another email.' });
     }
+
+    // Generate unique slug
+    const baseSlug = (orgReq.companyName || 'org').toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+    const slug = `${baseSlug}-${Date.now().toString().slice(-4)}`;
+
+    const planType = orgReq.selectedPlan?.includes('Enterprise') ? 'Enterprise Unlimited' : orgReq.selectedPlan?.includes('Growth') ? 'Growth Plan' : 'Free Demo';
+
+    // Create Organization First
+    const org = await Organization.create({
+      name: orgReq.companyName,
+      slug,
+      businessEmail: normalizedAdminEmail,
+      phone: orgReq.phone || '',
+      address: orgReq.address || '',
+      city: orgReq.city || '',
+      state: orgReq.state || '',
+      country: orgReq.country || 'India',
+      gstin: orgReq.gstin || '',
+      planType,
+      status: 'Active',
+      maxUsers: planType === 'Enterprise Unlimited' ? 100 : planType === 'Growth Plan' ? 25 : 5,
+      allowedModules: ALL_DEFAULT_MODULES,
+    });
 
     // Create Org Admin User Account
     const passwordHash = await bcrypt.hash(adminPassword, 10);
@@ -140,7 +228,7 @@ router.post('/requests/:id/approve', async (req, res) => {
     try {
       orgAdmin = await User.create({
         orgId: org._id,
-        name: orgReq.contactPerson,
+        name: orgReq.contactPerson || `${orgReq.companyName} Admin`,
         email: normalizedAdminEmail,
         passwordHash,
         isOrgAdmin: true,
@@ -151,7 +239,7 @@ router.post('/requests/:id/approve', async (req, res) => {
         plant: `${orgReq.companyName} Main Facility`,
         status: 'Active',
         isActive: true,
-        permissions: ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS', 'ATTENDANCE'],
+        permissions: ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS', 'ATTENDANCE', 'PRODUCTION', 'QUALITY', 'SALES', 'CRM', 'INVENTORY'],
       });
 
       // Update Org Admin reference
@@ -165,7 +253,7 @@ router.post('/requests/:id/approve', async (req, res) => {
       throw innerErr;
     }
 
-    // Create or update default roles for this Org
+    // Create default roles for this Org
     for (const r of DEFAULT_ROLES) {
       await Role.findOneAndUpdate(
         { orgId: org._id, name: r.name },
@@ -192,6 +280,7 @@ router.post('/requests/:id/approve', async (req, res) => {
       },
     });
   } catch (err) {
+    console.error('[Approve Org Error]', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -272,7 +361,7 @@ router.post('/orgs', async (req, res) => {
         planType: planType || 'Growth Plan',
         status: 'Active',
         maxUsers: maxUsers ? Number(maxUsers) : 25,
-        allowedModules: ['dashboard', 'crm', 'sales', 'purchase', 'inventory', 'production', 'quality', 'finance', 'reports', 'settings', 'notifications'],
+        allowedModules: ALL_DEFAULT_MODULES,
       });
 
       const passwordHash = await bcrypt.hash(adminPassword, 10);
@@ -290,7 +379,7 @@ router.post('/orgs', async (req, res) => {
         plant: `${name} Main Facility`,
         status: 'Active',
         isActive: true,
-        permissions: ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS', 'ATTENDANCE'],
+        permissions: ['DASHBOARD', 'ORG', 'SETTINGS', 'REPORTS', 'ATTENDANCE', 'PRODUCTION', 'QUALITY', 'SALES', 'CRM', 'INVENTORY'],
       });
 
       org.adminUserId = orgAdmin._id;
@@ -321,23 +410,6 @@ router.post('/orgs', async (req, res) => {
       }
       throw innerErr;
     }
-
-    for (const r of DEFAULT_ROLES) {
-      await Role.findOneAndUpdate(
-        { orgId: org._id, name: r.name },
-        { $setOnInsert: { ...r, orgId: org._id } },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-    }
-
-    res.status(201).json({
-      success: true,
-      data: {
-        organization: org,
-        adminCredentials: { email: orgAdmin.email, password: adminPassword },
-      },
-      message: 'Organization created successfully',
-    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -387,7 +459,6 @@ router.post('/orgs/:id/reset-password', async (req, res) => {
       adminUser = await User.findById(org.adminUserId);
     }
 
-    // Fallback: search by business email or orgId if adminUserId was not populated or invalid
     if (!adminUser) {
       adminUser = await User.findOne({
         $or: [
@@ -424,7 +495,6 @@ router.post('/orgs/:id/reset-password', async (req, res) => {
       await adminUser.save();
     }
 
-    // Re-link adminUserId if missing on org
     if (!org.adminUserId || String(org.adminUserId) !== String(adminUser._id)) {
       org.adminUserId = adminUser._id;
       await org.save().catch(() => null);

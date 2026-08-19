@@ -316,7 +316,19 @@ export default function SuperAdminDashboard({ user, onLogout, onSelectOrgForInsp
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => {
+              if (onSelectOrgForInspection) {
+                const targetOrg = orgs.length > 0 ? orgs[0] : { name: 'FreshPure Juices Main Facility', planType: 'Enterprise Unlimited' };
+                onSelectOrgForInspection(targetOrg);
+              }
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-blue-500/20 cursor-pointer"
+            title="Open full ERP Workspace (Production, Quality, Sales, Inventory)"
+          >
+            <Icon icon="mdi:rocket-launch" className="text-base" /> Launch ERP Workspace
+          </button>
           <button
             onClick={() => setShowAddOrgModal(true)}
             className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-orange-500/20 cursor-pointer"

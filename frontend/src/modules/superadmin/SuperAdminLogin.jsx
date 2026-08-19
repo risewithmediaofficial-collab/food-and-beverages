@@ -104,7 +104,7 @@ export default function SuperAdminLogin({ onSuperAdminLoginSuccess }) {
                 setDefaultPlanId('Growth Plan (₹4,999/mo)');
                 setShowPlanRequestModal(true);
               }}
-              className="w-full h-11 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2"
+              className="w-full h-11 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <Icon icon="mdi:domain" className="text-base text-slate-900" />
               Register Company
@@ -115,13 +115,23 @@ export default function SuperAdminLogin({ onSuperAdminLoginSuccess }) {
                 setDefaultPlanId('Free Demo (14 Days)');
                 setShowPlanRequestModal(true);
               }}
-              className="w-full h-11 bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2"
+              className="w-full h-11 bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <Icon icon="mdi:gift-outline" className="text-base text-orange-700" />
               Request Free Demo
             </button>
           </div>
-          <p className="text-[10px] text-slate-500 mt-3">Submit a company onboarding request and Super Admin will review it for approval.</p>
+          <p className="text-[10px] text-slate-500 mt-2">Submit a company onboarding request and Super Admin will review it for approval.</p>
+
+          <div className="pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className="text-xs text-slate-600 hover:text-orange-600 font-bold flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
+            >
+              <Icon icon="mdi:arrow-left" className="text-base" /> Switch to Organization / Employee Sign In
+            </button>
+          </div>
         </div>
         {noticeMessage && (
           <div className="mt-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl px-4 py-3 text-xs">

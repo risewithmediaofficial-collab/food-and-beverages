@@ -188,14 +188,23 @@ export default function LoginPanel({ onLoginSuccess }) {
                 </button>
               </div>
 
-              <div className="pt-2 border-t border-slate-100">
+              <div className="pt-2 border-t border-slate-100 space-y-2">
                 <button
                   type="button"
                   onClick={() => setShowPlanRequestModal(true)}
                   className="w-full h-10 text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-200 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Icon icon="mdi:gift-outline" className="text-base" />
-                  <span>Request Free Demo</span>
+                  <span>Request Free Demo / Register Organization</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/superadmin/login')}
+                  className="w-full h-10 text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Icon icon="mdi:shield-crown-outline" className="text-base text-orange-600" />
+                  <span>Super Admin Portal</span>
                 </button>
               </div>
             </form>

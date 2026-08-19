@@ -6,21 +6,17 @@ const orgRequestSchema = new mongoose.Schema({
   phone: { type: String, required: true },
   contactPerson: { type: String, required: true },
   industry: { type: String, default: 'Beverage & Juice Processing' },
-  requestType: { type: String, enum: ['Free Demo', 'Paid Plan'], default: 'Free Demo' },
-  selectedPlan: {
-    type: String,
-    enum: [
-      'Free Demo (14 Days)',
-      'Growth Plan (₹4,999/mo)',
-      'Enterprise Unlimited (₹14,999/mo)',
-    ],
-    default: 'Free Demo (14 Days)',
-  },
-  paymentStatus: {
-    type: String,
-    enum: ['Demo Access', 'Offline Payment Verified', 'Pending Verification'],
-    default: 'Demo Access',
-  },
+  requestType: { type: String, default: 'Free Demo' },
+  selectedPlan: { type: String, default: 'Free Demo (14 Days)' },
+  paymentStatus: { type: String, default: 'Demo Access' },
+  address: String,
+  city: String,
+  state: String,
+  country: { type: String, default: 'India' },
+  gstin: String,
+  pan: String,
+  companySize: { type: String, default: '1-50' },
+  website: String,
   modulesRequested: [{ type: String }],
   notes: String,
   status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], default: 'Pending' },
@@ -29,7 +25,7 @@ const orgRequestSchema = new mongoose.Schema({
   reviewedBy: String,
 }, { timestamps: true });
 
-const ALL_DEFAULT_MODULES = [
+export const ALL_DEFAULT_MODULES = [
   'dashboard', 'crm', 'leads', 'customers', 'sales', 'purchase', 'suppliers', 'rawmaterial',
   'inventory', 'warehouse', 'planning', 'production', 'batches', 'machine', 'machine_operation',
   'maintenance', 'quality', 'laboratory', 'packaging', 'dispatch', 'compliance', 'employees',
@@ -48,11 +44,10 @@ const organizationSchema = new mongoose.Schema({
   country: { type: String, default: 'India' },
   planType: {
     type: String,
-    enum: ['Free Demo', 'Growth Plan', 'Enterprise Unlimited'],
-    default: 'Free Demo',
+    default: 'Growth Plan',
   },
   status: { type: String, enum: ['Active', 'Suspended', 'Demo Expired'], default: 'Active' },
-  maxUsers: { type: Number, default: 20 },
+  maxUsers: { type: Number, default: 25 },
   adminUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   allowedModules: {
     type: [{ type: String }],
@@ -61,6 +56,7 @@ const organizationSchema = new mongoose.Schema({
   logoUrl: String,
   fssaiLicenseNo: String,
   gstin: String,
+  pan: String,
 }, { timestamps: true });
 
 export const OrgRequest = mongoose.models.OrgRequest || mongoose.model('OrgRequest', orgRequestSchema);
