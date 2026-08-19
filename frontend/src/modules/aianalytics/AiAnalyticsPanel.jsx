@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Icon } from '@iconify/react';
+import ExportDataToolbar from '../../components/ExportDataToolbar';
 
 export default function AiAnalyticsPanel() {
   const [insights] = useState([
@@ -17,6 +18,7 @@ export default function AiAnalyticsPanel() {
           </h2>
           <p className="text-xs text-slate-400">Machine learning demand forecasting, predictive maintenance, and raw material optimization suggestions</p>
         </div>
+        <ExportDataToolbar data={insights} filename="ai_predictive_insights" title="AI Predictive Analytics Insights" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

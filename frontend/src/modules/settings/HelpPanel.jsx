@@ -1,4 +1,5 @@
 import { Icon } from '@iconify/react';
+import ExportDataToolbar from '../../components/ExportDataToolbar';
 
 export default function HelpPanel() {
   const faqs = [
@@ -21,11 +22,17 @@ export default function HelpPanel() {
     { key: 'Alt + H', action: 'Employee Master' },
   ];
 
+  const helpReport = [
+    ...faqs.map((faq, index) => ({ type: 'FAQ', item: `Q${index + 1}`, question: faq.q, answer: faq.a })),
+    ...shortcuts.map((shortcut) => ({ type: 'Shortcut', item: shortcut.key, question: shortcut.action, answer: '' })),
+  ];
+
   return (
     <div className="space-y-6 font-sans">
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-900 via-zinc-900 to-slate-950 border border-slate-800 p-6 rounded-2xl shadow-sm">
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-2">
+          <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-orange-500/20 border border-orange-500/40 rounded-xl flex items-center justify-center">
             <Icon icon="mdi:help-circle-outline" className="text-orange-400 text-xl" />
           </div>
@@ -33,6 +40,8 @@ export default function HelpPanel() {
             <h2 className="text-base font-extrabold text-white">Food & Beverages ERP — Help Center & User Guide</h2>
             <p className="text-xs text-slate-400">Quick reference for all ERP modules, keyboard shortcuts, and FAQ for your team</p>
           </div>
+          </div>
+          <ExportDataToolbar data={helpReport} filename="erp_help_center_guide" title="ERP Help Center & User Guide" />
         </div>
       </div>
 

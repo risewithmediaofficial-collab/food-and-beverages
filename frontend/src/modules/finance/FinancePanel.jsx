@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { Icon } from '@iconify/react';
+import ExportDataToolbar from '../../components/ExportDataToolbar';
 
 export default function FinancePanel() {
   const [ledgers, setLedgers] = useState([]);
@@ -114,12 +115,15 @@ export default function FinancePanel() {
           <p className="text-xs text-slate-400">Automated double-entry accounting entries generated from Sales, Purchase & Line Production costs</p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 cursor-pointer w-full sm:w-auto"
-        >
-          <Icon icon="mdi:plus" className="text-base" /> Add Ledger Entry
-        </button>
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <ExportDataToolbar data={ledgers} filename="financial_ledgers" title="Financial Ledgers & Profitability" />
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 cursor-pointer w-full sm:w-auto"
+          >
+            <Icon icon="mdi:plus" className="text-base" /> Add Ledger Entry
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

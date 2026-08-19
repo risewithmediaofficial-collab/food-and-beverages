@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Icon } from '@iconify/react';
+import ExportDataToolbar from '../../components/ExportDataToolbar';
 
 export default function NotificationsPanel() {
   const [notifications, setNotifications] = useState([]);
@@ -13,6 +14,7 @@ export default function NotificationsPanel() {
           </h2>
           <p className="text-xs text-slate-400">Automated event alerts: low stock, machine breakdowns, QC failures, batch completions & approvals</p>
         </div>
+        <ExportDataToolbar data={notifications} filename="system_notifications" title="System Notifications & Alerts" />
       </div>
 
       {notifications.length === 0 ? (

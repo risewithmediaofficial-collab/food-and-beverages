@@ -16,7 +16,11 @@ router.get('/records', async (req, res) => {
 // POST create dispatch record
 router.post('/records', async (req, res) => {
   try {
-    const record = new DispatchOrder(req.body);
+    const record = new DispatchOrder({
+      ...req.body,
+      batchId: req.body.batchId || req.body.orderNo || req.body.dispatchNo,
+      dispatchNo: req.body.dispatchNo || req.body.id || `DSP-${Date.now().toString().slice(-6)}`,
+    });
     await record.save();
     res.status(201).json({ success: true, data: record });
   } catch (err) {

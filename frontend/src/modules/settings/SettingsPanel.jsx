@@ -1,9 +1,17 @@
 import { Icon } from '@iconify/react';
 import { Link } from 'react-router-dom';
 import useMountAnimation from '../../lib/useMountAnimation';
+import ExportDataToolbar from '../../components/ExportDataToolbar';
 
 export default function SettingsPanel() {
   const mountCls = useMountAnimation();
+  const settingsSections = [
+    { module: 'Organization & GST Setup', path: '/org', description: 'Company GSTIN, FSSAI & Tax info' },
+    { module: 'User Management', path: '/users', description: 'Create and manage user accounts' },
+    { module: 'Roles & Permissions', path: '/roles', description: 'Define roles and module access' },
+    { module: 'Factories', path: '/factories', description: 'Manage manufacturing plants' },
+    { module: 'Departments', path: '/departments', description: 'Organizational departments & cost centers' },
+  ];
   return (
     <div className={`space-y-6 font-sans transition duration-300 ease-out ${mountCls}`}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-xs">
@@ -13,6 +21,7 @@ export default function SettingsPanel() {
           </h2>
           <p className="text-xs text-slate-400">Application settings, role-based access control, factories, and departments</p>
         </div>
+        <ExportDataToolbar data={settingsSections} filename="settings_modules_report" title="Settings Modules Report" />
       </div>
 
       <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs p-6">

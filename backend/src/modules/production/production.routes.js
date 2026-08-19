@@ -76,9 +76,8 @@ router.get('/plans', async (req, res) => {
 
 router.post('/plans', async (req, res) => {
   try {
-    const plan = new ProductionPlan(req.body);
-    await plan.save();
-    res.status(201).json({ success: true, data: plan });
+    const result = await productionService.createProductionPlan(req.body);
+    res.status(201).json({ success: true, data: result.plan, routedProductionOrder: result.productionOrder });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -87,7 +86,18 @@ router.post('/plans', async (req, res) => {
 router.put('/plans/:id', async (req, res) => {
   try {
     const plan = await ProductionPlan.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json({ success: true, data: plan });
+    if (!plan) return res.status(404).json({ success: false, message: 'Production plan not found' });
+    const result = await productionService.routeProductionPlanToOrder(plan);
+    res.json({ success: true, data: result.plan, routedProductionOrder: result.productionOrder });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+router.post('/plans/:id/complete', async (req, res) => {
+  try {
+    const result = await productionService.completeProductionPlan(req.params.id);
+    res.json({ success: true, data: result.plan, routedProductionOrder: result.productionOrder });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -141,4 +151,3 @@ router.delete('/batches/:id', async (req, res) => {
 });
 
 export default router;
-

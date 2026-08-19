@@ -16,8 +16,12 @@ const qcCheckSchema = new mongoose.Schema({
     enum: ['incoming', 'in_process', 'finished_goods'],
     required: true,
   },
-  refId: { type: mongoose.Schema.Types.ObjectId },
+  refId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductionOrder' },
   batchId: { type: String, required: true },
+  productName: String,
+  orderNo: String,
+  qtyTested: Number,
+  unit: { type: String, default: 'Bottles' },
   parameters: [qcParameterSchema],
   overallResult: {
     type: String,

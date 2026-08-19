@@ -178,14 +178,20 @@ export default function ProductionPanel({ user, triggerError }) {
       return;
     }
     try {
-      const res = await api.post(`/production/orders/${id}/complete`, { qtyProduced: 4950 });
+      const order = orders.find(o => o._id === id);
+      const res = await api.post(`/production/orders/${id}/complete`, {
+        qtyProduced: order?.qtyPlanned || 5000,
+      });
       if (res.success && res.data?.order) {
-        setOrders(orders.map(o => o._id === id ? { ...o, status: res.data.order.status || 'quality_testing', qtyProduced: res.data.order.qtyProduced || 4950 } : o));
+        setOrders(orders.map(o => o._id === id ? { ...o, status: res.data.order.status || 'quality_testing', qtyProduced: res.data.order.qtyProduced || (order?.qtyPlanned || 5000) } : o));
+        if (triggerError) triggerError('Production completed! Batch is now Waiting for Quality Check in Quality Control.', 'success');
         return;
       }
       throw new Error(res.message || 'Unable to complete production');
     } catch (err) {
-      setOrders(orders.map(o => o._id === id ? { ...o, status: 'quality_testing', qtyProduced: o.qtyPlanned } : o));
+      const order = orders.find(o => o._id === id);
+      setOrders(orders.map(o => o._id === id ? { ...o, status: 'quality_testing', qtyProduced: order?.qtyPlanned || 5000 } : o));
+      if (triggerError) triggerError('Production completed! Batch is now Waiting for Quality Check in Quality Control.', 'success');
     }
   };
 
@@ -374,21 +380,27 @@ export default function ProductionPanel({ user, triggerError }) {
                     <span className="text-xs text-slate-500 font-mono block mt-1">Batch ID: <strong className="text-slate-800">{o.batchId}</strong></span>
                   </div>
 
-                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
-                    o.status === 'running' ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse' : o.status === 'quality_testing' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-600'
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                    o.status === 'running'
+                      ? 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse'
+                      : o.status === 'quality_testing'
+                      ? 'bg-amber-50 text-amber-800 border-amber-300 animate-pulse'
+                      : o.status === 'completed'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
                   }`}>
-                    {(o.status || 'planning').replace('_', ' ')}
+                    {o.status === 'quality_testing' ? '⏳ Waiting for QC' : (o.status || 'planning').replace('_', ' ')}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 text-center mt-3">
                   <div>
                     <span className="text-[10px] text-slate-400 block font-semibold">Planned Qty</span>
-                    <span className="text-xs font-mono font-bold text-slate-800">{(o.qtyPlanned || 0).toLocaleString()}</span>
+                    <span className="text-xs font-mono font-bold text-slate-800">{(o.qtyPlanned || 0).toLocaleString()} {o.unit || ''}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 block font-semibold">Produced Qty</span>
-                    <span className="text-xs font-mono font-bold text-blue-600">{o.qtyProduced ? o.qtyProduced.toLocaleString() : '0'}</span>
+                    <span className="text-xs font-mono font-bold text-blue-600">{o.qtyProduced ? Number(o.qtyProduced).toLocaleString() : '0'}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 block font-semibold">Shift</span>
@@ -401,21 +413,21 @@ export default function ProductionPanel({ user, triggerError }) {
                 <div className="flex gap-1">
                   <button
                     onClick={() => setEditingOrder(o)}
-                    className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                    className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition cursor-pointer"
                     title="Edit Order"
                   >
                     <Icon icon="mdi:pencil-outline" className="text-base" />
                   </button>
                   <button
                     onClick={() => handleDeleteOrder(o._id)}
-                    className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                    className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                     title="Delete Order"
                   >
                     <Icon icon="mdi:trash-can-outline" className="text-base" />
                   </button>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   {o.status === 'planning' && (
                     <button
                       onClick={() => handleStartProduction(o._id)}
@@ -425,18 +437,27 @@ export default function ProductionPanel({ user, triggerError }) {
                     </button>
                   )}
 
-                  {o.status === 'running' && (
+                  {(o.status === 'running' || o.status === 'planning') && (
                     <button
                       onClick={() => handleCompleteProduction(o._id)}
                       className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 cursor-pointer"
                     >
-                      <Icon icon="mdi:check-circle" className="text-base" /> Complete
+                      <Icon icon="mdi:flask-outline" className="text-base" /> Complete & Send to QC
                     </button>
                   )}
 
                   {o.status === 'quality_testing' && (
-                    <span className="text-xs text-indigo-600 font-bold flex items-center gap-1">
-                      <Icon icon="mdi:loading" className="animate-spin text-base" /> In QC Testing
+                    <a
+                      href="/quality"
+                      className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Icon icon="mdi:beaker-check-outline" className="text-base text-amber-600" /> Open Quality Control →
+                    </a>
+                  )}
+
+                  {o.status === 'completed' && (
+                    <span className="text-xs text-emerald-700 font-bold flex items-center gap-1">
+                      <Icon icon="mdi:check-circle" className="text-base" /> Passed QC & Released
                     </span>
                   )}
                 </div>

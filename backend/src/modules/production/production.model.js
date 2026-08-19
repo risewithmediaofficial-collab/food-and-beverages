@@ -7,6 +7,7 @@ const productionOrderSchema = new mongoose.Schema({
   productName: { type: String, required: true },
   salesOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'SalesOrder' },
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
+  productionPlanId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductionPlan' },
   recipeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipe' },
   qtyPlanned: { type: Number, required: true },
   qtyProduced: { type: Number, default: 0 },
@@ -45,6 +46,7 @@ const productionPlanSchema = new mongoose.Schema({
   capacityPct: Number,
   capacityUtilizationPct: { type: Number, default: 80 },
   status: { type: String, default: 'Planning' },
+  routedProductionOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductionOrder' },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
@@ -66,4 +68,3 @@ const batchSchema = new mongoose.Schema({
 export const ProductionOrder = mongoose.models.ProductionOrder || mongoose.model('ProductionOrder', productionOrderSchema);
 export const ProductionPlan = mongoose.models.ProductionPlan || mongoose.model('ProductionPlan', productionPlanSchema);
 export const Batch = mongoose.models.Batch || mongoose.model('Batch', batchSchema);
-

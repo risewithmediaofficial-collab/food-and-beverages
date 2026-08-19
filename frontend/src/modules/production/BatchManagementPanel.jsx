@@ -339,13 +339,26 @@ export default function BatchManagementPanel({ user, triggerError }) {
                     <td className="p-4 font-mono text-slate-600 font-semibold">{b.lineCode || b.machineLine || 'MAC-FIL-01'}</td>
                     <td className="p-4">
                       <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
-                        (b.qcStatus === 'Approved') ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                        b.qcStatus === 'Approved'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : b.qcStatus === 'Rejected'
+                          ? 'bg-rose-50 text-rose-700 border-rose-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-300 animate-pulse'
                       }`}>
-                        {b.qcStatus || 'Quarantined'}
+                        {b.qcStatus === 'Approved' ? '✓ Approved' : b.qcStatus || 'Quarantined - Waiting for QC'}
                       </span>
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {b.qcStatus !== 'Approved' && (
+                          <a
+                            href="/quality"
+                            className="p-1 hover:bg-amber-50 text-amber-700 rounded text-xs font-bold flex items-center gap-1"
+                            title="Inspect in Quality Control"
+                          >
+                            <Icon icon="mdi:beaker-check-outline" className="text-base text-amber-600" />
+                          </a>
+                        )}
                         <button onClick={() => openEditModal(b)} className="p-1.5 hover:bg-slate-100 text-slate-600 rounded cursor-pointer">
                           <Icon icon="mdi:pencil-outline" className="text-base text-slate-600" />
                         </button>

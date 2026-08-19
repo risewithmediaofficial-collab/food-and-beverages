@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { Icon } from '@iconify/react';
+import ExportDataToolbar from '../../components/ExportDataToolbar';
 
 export default function RfidAttendancePanel() {
   const [activeTab, setActiveTab] = useState('live');
@@ -65,7 +66,12 @@ export default function RfidAttendancePanel() {
           <p className="text-xs text-slate-400">Real-time RFID card scan, biometric punch logs, hardware device IP status & live attendance screen</p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <ExportDataToolbar
+            data={activeTab === 'devices' ? devices : logs}
+            filename={activeTab === 'devices' ? 'rfid_hardware_devices' : 'rfid_attendance_logs'}
+            title={activeTab === 'devices' ? 'RFID Hardware Devices' : 'RFID Attendance Logs'}
+          />
           <button
             onClick={() => setActiveTab('live')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${

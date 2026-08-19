@@ -16,6 +16,7 @@ export default function DispatchPanel({ user, triggerError }) {
     driverName: '',
     destination: '',
     orderNo: '',
+    batchId: '',
     qtyLoaded: '',
     status: 'In Transit',
     gpsLocation: '',
@@ -56,6 +57,7 @@ export default function DispatchPanel({ user, triggerError }) {
       setFormData({
         ...formData,
         orderNo: ord.orderNo || `PO-${ord._id.slice(-5)}`,
+        batchId: ord.batchId || '',
         qtyLoaded: `${(ord.qtyProduced || ord.qtyPlanned || 5000).toLocaleString()} ${ord.unit || 'Bottles'} (${ord.productName})`,
       });
     }
@@ -72,6 +74,7 @@ export default function DispatchPanel({ user, triggerError }) {
         driverName: formData.driverName,
         destination: formData.destination,
         orderNo: formData.orderNo,
+        batchId: formData.batchId || formData.orderNo || formData.id,
         qtyLoaded: formData.qtyLoaded,
         status: formData.status,
         gpsLocation: formData.gpsLocation,
@@ -80,7 +83,7 @@ export default function DispatchPanel({ user, triggerError }) {
       if (res.success && res.data) {
         setDispatches([res.data, ...dispatches]);
         setShowAddModal(false);
-        setFormData({ id: '', vehicleNo: '', driverName: '', destination: '', orderNo: '', qtyLoaded: '', status: 'In Transit', gpsLocation: '' });
+        setFormData({ id: '', vehicleNo: '', driverName: '', destination: '', orderNo: '', batchId: '', qtyLoaded: '', status: 'In Transit', gpsLocation: '' });
         if (triggerError) triggerError('Dispatch delivery order created!', 'success');
       } else {
         throw new Error(res.message || 'Failed to create dispatch order');
@@ -134,6 +137,7 @@ export default function DispatchPanel({ user, triggerError }) {
       driverName: d.driverName || '',
       destination: d.destination || '',
       orderNo: d.orderNo || '',
+      batchId: d.batchId || '',
       qtyLoaded: d.qtyLoaded || '5,000 Bottles',
       status: d.status || 'In Transit',
       gpsLocation: d.gpsLocation || '',
@@ -154,7 +158,7 @@ export default function DispatchPanel({ user, triggerError }) {
           <ExportDataToolbar data={dispatches} filename="dispatch_logistics_orders" title="Dispatch & Delivery Orders" />
           <button
             onClick={() => {
-              setFormData({ id: `DSP-2026-10${dispatches.length + 1}`, vehicleNo: 'MH-15-EG-4521', driverName: 'Ramesh Patil', destination: '', orderNo: 'SO-2026-001', qtyLoaded: '5,000 Bottles', status: 'In Transit', gpsLocation: 'Expressway In-Transit' });
+              setFormData({ id: `DSP-2026-10${dispatches.length + 1}`, vehicleNo: 'MH-15-EG-4521', driverName: 'Ramesh Patil', destination: '', orderNo: 'SO-2026-001', batchId: '', qtyLoaded: '5,000 Bottles', status: 'In Transit', gpsLocation: 'Expressway In-Transit' });
               setShowAddModal(true);
             }}
             className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-orange-500/20 cursor-pointer"
@@ -314,7 +318,7 @@ export default function DispatchPanel({ user, triggerError }) {
           <p className="text-xs text-slate-400 max-w-sm mx-auto">No vehicles are currently dispatched or loading for delivery. Click below to create a dispatch order.</p>
           <button
             onClick={() => {
-              setFormData({ id: 'DSP-2026-101', vehicleNo: 'MH-15-EG-4521', driverName: 'Ramesh Patil', destination: '', orderNo: 'SO-2026-001', qtyLoaded: '5,000 Bottles', status: 'In Transit', gpsLocation: 'Expressway In-Transit' });
+              setFormData({ id: 'DSP-2026-101', vehicleNo: 'MH-15-EG-4521', driverName: 'Ramesh Patil', destination: '', orderNo: 'SO-2026-001', batchId: '', qtyLoaded: '5,000 Bottles', status: 'In Transit', gpsLocation: 'Expressway In-Transit' });
               setShowAddModal(true);
             }}
             className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-2 cursor-pointer shadow-sm"
