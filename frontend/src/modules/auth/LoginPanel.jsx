@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
+import { setAuthSession } from '../../lib/authSession';
 import { Icon } from '@iconify/react';
 import splash from '../../assets/splash.svg';
 import PlanRequestModal from './PlanRequestModal';
@@ -40,8 +41,7 @@ export default function LoginPanel({ onLoginSuccess }) {
     try {
       const res = await api.post('/auth/login', { email: email.trim(), password });
       if (res.success && res.accessToken) {
-        localStorage.setItem('access_token', res.accessToken);
-        localStorage.setItem('user', JSON.stringify(res.user));
+        setAuthSession(res.accessToken, res.user);
         onLoginSuccess(res.user);
         return;
       }

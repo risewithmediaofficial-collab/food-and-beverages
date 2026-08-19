@@ -48,16 +48,23 @@ import SuperAdminLogin from './modules/superadmin/SuperAdminLogin';
 import SuperAdminDashboard from './modules/superadmin/SuperAdminDashboard';
 import { getModuleIdFromPath, MODULE_MAP } from './moduleRoutes';
 import { canAccessModule, firstAccessibleModule } from './accessControl';
+import {
+  getAuthUser,
+  clearAuthSession,
+  getInspectedOrg,
+  setInspectedOrgSession,
+  clearInspectedOrgSession,
+} from './lib/authSession';
 
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeModule, setActiveModule] = useState('dashboard');
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => getAuthUser());
   const [notification, setNotification] = useState({ message: '', type: 'error' });
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [inspectedOrg, setInspectedOrg] = useState(null);
+  const [inspectedOrg, setInspectedOrg] = useState(() => getInspectedOrg());
 
   const triggerError = useCallback((msg, type = 'error') => {
     setNotification({ message: msg, type });
@@ -73,21 +80,16 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
+    const savedUser = getAuthUser();
     if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser);
-        setUser(parsed);
-        if (location.pathname === '/' || location.pathname === '/login' || location.pathname === '/superadmin/login') {
-          if (parsed.isSuperAdmin) {
-            navigate('/superadmin', { replace: true });
-          } else {
-            setActiveModule('dashboard');
-            navigate('/dashboard', { replace: true });
-          }
+      setUser(savedUser);
+      if (location.pathname === '/' || location.pathname === '/login' || location.pathname === '/superadmin/login') {
+        if (savedUser.isSuperAdmin) {
+          navigate('/superadmin', { replace: true });
+        } else {
+          setActiveModule('dashboard');
+          navigate('/dashboard', { replace: true });
         }
-      } catch {
-        setUser(null);
       }
     }
   }, [location.pathname, navigate]);
@@ -121,9 +123,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('inspected_org_id');
+    clearAuthSession();
     setUser(null);
     setInspectedOrg(null);
     navigate('/login');
@@ -136,9 +136,7 @@ function App() {
         user={user}
         onLogout={handleLogout}
         onSelectOrgForInspection={(org) => {
-          if (org?._id) {
-            localStorage.setItem('inspected_org_id', org._id);
-          }
+          setInspectedOrgSession(org);
           setInspectedOrg(org || { name: 'Master Enterprise Plant', planType: 'Enterprise Unlimited' });
           navigate('/dashboard');
         }}
@@ -235,7 +233,7 @@ function App() {
             </div>
             <button
               onClick={() => {
-                localStorage.removeItem('inspected_org_id');
+                clearInspectedOrgSession();
                 setInspectedOrg(null);
               }}
               className="bg-slate-950 hover:bg-slate-900 text-white text-[11px] px-3 py-1 rounded-lg font-bold cursor-pointer"

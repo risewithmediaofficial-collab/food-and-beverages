@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { api } from '../../lib/api';
+import { setAuthSession } from '../../lib/authSession';
 import PlanRequestModal from '../auth/PlanRequestModal';
 
 export default function SuperAdminLogin({ onSuperAdminLoginSuccess }) {
@@ -21,8 +22,7 @@ export default function SuperAdminLogin({ onSuperAdminLoginSuccess }) {
     try {
       const res = await api.post('/superadmin/login', { email, password });
       if (res?.accessToken) {
-        localStorage.setItem('access_token', res.accessToken);
-        localStorage.setItem('user', JSON.stringify(res.user));
+        setAuthSession(res.accessToken, res.user);
         if (onSuperAdminLoginSuccess) {
           onSuperAdminLoginSuccess(res.user);
         }

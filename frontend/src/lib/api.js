@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getAuthToken, getInspectedOrgId } from './authSession';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
@@ -9,14 +10,14 @@ export const api = axios.create({
   },
 });
 
-// Request interceptor to attach JWT token and optional org context
+// Request interceptor to attach JWT token and optional inspected org context
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
+  const token = getAuthToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  const inspectedOrgId = localStorage.getItem('inspected_org_id');
+  const inspectedOrgId = getInspectedOrgId();
   if (inspectedOrgId) {
     config.headers['X-Org-ID'] = inspectedOrgId;
   }
