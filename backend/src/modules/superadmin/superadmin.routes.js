@@ -23,6 +23,57 @@ const router = express.Router();
 
 const SUPER_ADMIN_EMAIL = 'superadmin@juice-erp.com';
 
+// Helper to safely seed roles for an organization without breaking on obsolete indexes
+export const seedOrgRoles = async (orgId) => {
+  if (!orgId) return;
+
+  // Drop obsolete global unique indexes on roles collection if present in MongoDB
+  try {
+    const indexes = await Role.collection.indexes();
+    for (const idx of indexes) {
+      if (idx.name === 'name_1' || idx.name === 'roleName_1') {
+        try {
+          await Role.collection.dropIndex(idx.name);
+          console.log(`🧹 Dropped obsolete global Role index: ${idx.name}`);
+        } catch (e) {}
+      }
+    }
+  } catch (e) {}
+
+  for (const r of DEFAULT_ROLES) {
+    try {
+      const existing = await Role.findOne({ orgId, name: r.name });
+      if (!existing) {
+        await Role.create({
+          orgId,
+          name: r.name,
+          roleName: r.roleName || r.name,
+          accessLevel: r.accessLevel || 'Custom Access',
+          permissions: r.permissions || [],
+          description: r.description || '',
+          status: 'Active',
+        });
+      }
+    } catch (err) {
+      try {
+        await Role.collection.dropIndex('name_1');
+      } catch (e) {}
+      try {
+        await Role.collection.dropIndex('roleName_1');
+      } catch (e) {}
+      try {
+        await Role.findOneAndUpdate(
+          { orgId, name: r.name },
+          { $set: { ...r, orgId } },
+          { upsert: true }
+        );
+      } catch (err2) {
+        console.warn(`[Role Seed Non-fatal] Could not seed role ${r.name}:`, err2.message);
+      }
+    }
+  }
+};
+
 // Ensure Super Admin user and a default Organization exist in DB
 export const ensureSuperAdmin = async () => {
   try {
@@ -67,13 +118,7 @@ export const ensureSuperAdmin = async () => {
 
     if (defaultOrg) {
       // Ensure default roles exist for default organization
-      for (const r of DEFAULT_ROLES) {
-        await Role.findOneAndUpdate(
-          { orgId: defaultOrg._id, name: r.name },
-          { $setOnInsert: { ...r, orgId: defaultOrg._id } },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
-      }
+      await seedOrgRoles(defaultOrg._id);
 
       // Ensure default users exist for default organization
       const defaultUsersToSeed = [
@@ -302,14 +347,8 @@ router.post('/requests/:id/approve', async (req, res) => {
     org.adminUserId = orgAdmin._id;
     await org.save();
 
-    // Create default roles for this Org
-    for (const r of DEFAULT_ROLES) {
-      await Role.findOneAndUpdate(
-        { orgId: org._id, name: r.name },
-        { $setOnInsert: { ...r, orgId: org._id } },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-    }
+    // Create default roles safely for this Org
+    await seedOrgRoles(org._id);
 
     // Update Request status
     orgReq.status = 'Approved';
@@ -454,13 +493,7 @@ router.post('/orgs', async (req, res) => {
     org.adminUserId = orgAdmin._id;
     await org.save();
 
-    for (const r of DEFAULT_ROLES) {
-      await Role.findOneAndUpdate(
-        { orgId: org._id, name: r.name },
-        { $setOnInsert: { ...r, orgId: org._id } },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-    }
+    await seedOrgRoles(org._id);
 
     return res.status(201).json({
       success: true,
